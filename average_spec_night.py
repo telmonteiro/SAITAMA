@@ -26,25 +26,32 @@ for i, star in enumerate(stars_list):
 
             #group files by observation date
             file_groups = defaultdict(list)
+            dates_list = []
             for extension in extension_list:  #assuming the date is extracted correctly for extension files
                 files = [f for f in os.listdir(root_directory) if f.startswith(f'HARPS.') and f.endswith(f'{extension}.fits')]
                 for file in files:
-                    date = file.split('.')[1].split('T')[0]  #extract date from the filename
-                    file_groups[date].append(file)
+                    fits_file = fits.open(f"pepe_2011/{star}/"+file)
+                    date_bjd = fits_file[0].header["MJD-OBS"]  #extract date BJD from the filename
+                    del fits_file
+                    file_groups[round(date_bjd)].append(file)
+                    date = file.split('.')[1].split('T')[0]
+                    dates_list.append(date)
 
             #process each group
             for i, ext in enumerate(extension_list):
+                k = 0
                 for date, files in file_groups.items():
                     files = [x for x in files if ext in x]
                     #print(files)
 
-                    output_filename = f"average_{date}_{ext}.fits"
+                    output_filename = f"average_{dates_list[k]}_{ext}.fits"
                     output_path = os.path.join(output_directory, output_filename)
 
                     avg_data, hdr = create_average_spectrum(folder_path=root_directory, files=files, extension=None)
                     if type(avg_data) != int and type(hdr) != int: #crude way of checking if its in the correct type
                         fits.writeto(output_path, avg_data, header=hdr, overwrite=True, output_verify='ignore')
-                        print(f"{date} data processed")
+                        print(f"{dates_list[k]} data processed")
+                        k += 1
 
         elif p == "data/reduced": 
             root_directory = "/home/telmo/PEEC/ACTIN2/pepe_2011/{}/data/reduced/".format(star)

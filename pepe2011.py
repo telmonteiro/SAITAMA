@@ -1,5 +1,6 @@
 from actin2.actin2 import ACTIN
 import glob, os, numpy as np, matplotlib.pylab as plt, astropy, pandas as pd
+from astropy.io import fits
 from pyrhk.pyrhk import calc_smw, get_bv, calc_rhk
 from util_funcs import _get_simbad_data, plot_RV_indices, stats_indice, sigma_clip
 '''
@@ -51,7 +52,7 @@ for i, star in enumerate(stars_list):
     #crude sigma clipping, couldnt apply directly with astropy
     cols = indices
     cols.append("rv")
-    df = sigma_clip(df, cols, sigma=4)
+    df = sigma_clip(df, cols, sigma=3.5)
 
     #visualize RV and three different indices
     plot_RV_indices(star, df, indices, save=True)
@@ -66,28 +67,33 @@ for i, star in enumerate(stars_list):
         smw, smw_err = calc_smw(caii=df["I_CaII"].values, caii_err=df["I_CaII_err"].values, instr=comb[0])
         bv, bv_err, bv_ref = get_bv(star, alerts=True)
         log_rhk, log_rhk_err, rhk, rhk_err = calc_rhk(smw, smw_err, bv, method=comb[1], evstage='MS')
-        bjd = np.array(df.bjd)
+        bjd = np.around(np.array(df.bjd))
 
         #get log R_hk of article Pepe et al 2011
-        fits_table_pepe2011= astropy.io.fits.open(f'pepe_2011/{star}/pepe2011_{star}.fit')
+        fits_table_pepe2011= fits.open(f'pepe_2011/{star}/pepe2011_{star}.fit')
         data = fits_table_pepe2011[1].data
         log_rhk_pepe2011 = np.array([data[x][-2] for x in range(len(data))]) #extract column in numpy format
         log_rhk_err_pepe2011 = np.array([data[x][-1] for x in range(len(data))])
-        BJD_pepe2011 = np.array([data[x][0] for x in range(len(data))])
+        BJD_pepe2011 = np.array([round(data[x][0]) for x in range(len(data))])
+
+        df_pepe = pd.DataFrame({"log_rhk":log_rhk_pepe2011,"log_rhk_err":log_rhk_err_pepe2011,"bjd":BJD_pepe2011})
+        df_pepe = sigma_clip(df_pepe, cols=df_pepe.columns, sigma=6.5)
 
         #visualize log R_hk from Pepe et al 2011 with obtained from ACTIN2
         axs[k, i].errorbar(bjd - 2450000, log_rhk, log_rhk_err, fmt='k.',
                                label=f"ACTIN2, N = {len(log_rhk)}")
-        axs[k, i].errorbar(BJD_pepe2011 - 2450000, log_rhk_pepe2011, log_rhk_err_pepe2011, fmt='r.',
-                               label=f"Pepe at al, 2011, N = {len(log_rhk_pepe2011)}")
+        axs[k, i].errorbar(df_pepe["bjd"] - 2450000, df_pepe["log_rhk"], df_pepe["log_rhk_err"], fmt='r.',
+                               label=f"Pepe et al, 2011, N = {len(df_pepe['log_rhk'])}")
         axs[k, i].set_ylabel("log R_hk")
         axs[k, i].set_xlabel("BJD $-$ 2450000 [days]")
         axs[k, i].set_title(star)
         axs[k, i].legend(loc="best",fontsize=9)
 
         if k == 0: #for the best combination
-            axs1[i].errorbar(bjd - 2450000, log_rhk, log_rhk_err, fmt='k.', label="ACTIN2, N = {}".format(len(log_rhk)))
-            axs1[i].errorbar(BJD_pepe2011 - 2450000, log_rhk_pepe2011, log_rhk_err_pepe2011, fmt='r.', label="Pepe at al, 2011, N = {}".format(len(log_rhk_pepe2011)))
+            axs1[i].errorbar(bjd - 2450000, log_rhk, log_rhk_err, fmt='k.', 
+                             label="ACTIN2, N = {}".format(len(log_rhk)))
+            axs1[i].errorbar(df_pepe["bjd"] - 2450000, df_pepe["log_rhk"], df_pepe["log_rhk_err"], fmt='r.', 
+                             label="Pepe at al, 2011, N = {}".format(len(df_pepe['log_rhk'])))
             axs1[i].set_ylabel("log R_hk")
             axs1[i].set_xlabel("BJD $-$ 2450000 [days]")
             axs1[i].set_title(star)
