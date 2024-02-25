@@ -1,22 +1,9 @@
 from actin2.actin2 import ACTIN
 import glob, os, numpy as np, matplotlib.pylab as plt, astropy, pandas as pd
 from astropy.io import fits
+from util_funcs import _get_simbad_data, plot_RV_indices, sigma_clip, stats_indice, read_fits
 from pyrhk.pyrhk import calc_smw, get_bv, calc_rhk
-from util_funcs import _get_simbad_data, plot_RV_indices, stats_indice, sigma_clip
-'''
-Data from https://archive.eso.org/eso/eso_archive_main.html (see print)
-- This script runs ACTIN2 on the fits files of three stars from the paper Pepe et al 2011, to compare the log R_hk values from the paper and ACTIN2.
-- It gets the SIMBAD data, plots RV and activity indices Calcium II, Halpha 0.6 Angstrom and Na I vs BJD, and then converts the I_CaII to log R_hk
-- Finally it plots the two obtained log R_hk
 
-The data was obtained manually from ESO archive, and then another script (average_spec_night.py) was made because in the paper they averaged the observations
-by night. Unfortunately, for some reason the number of data points is not quite the same, maybe because of outlier cleaning.
-
-The agreement between the two values varies with the calibrations used: CaII -> smw (HARPS_L11 or HARPS_GDS21) and bolometric correction (middelkoop or rutten).
-The one that shows overall best agreement is HARPS_L11 and middelkoop.
-
-The values of B-V used in both this script and the paper are the same (from SIMBAD).
-'''
 actin = ACTIN()
 
 stars_list = ["HD20794","HD85512","HD192310"] #pepe et al 2011 stars
@@ -34,35 +21,39 @@ fig1.suptitle(r"$\log R'_{HK}$ for three stars from Pepe et al. 2011 with HARPS_
 for k, row_title in enumerate(row_titles):
     fig.text(0.5, 0.905 - k * 0.207, row_title, va='center', ha='center', rotation='horizontal', fontsize=13)
 
+
 for i, star in enumerate(stars_list):
-    root_directory = f"/home/telmo/PEEC/ACTIN2/pepe_2011/{star}/avg_spec/"
+    root_directory = f"/home/telmo/PEEC/ACTIN2/pepe_2011/{star}/avg_spec_rv_corr/"
 
-    files = glob.glob(os.path.join(f"pepe_2011/{star}/avg_spec/", "*s1d_A.fits"))
-    if star == "HD192310":
-        files.remove("pepe_2011/HD192310/avg_spec/average_2004-12-02_s1d_A.fits") #error in this spectra, don't know why
+    files = glob.glob(os.path.join(f"pepe_2011/{star}/avg_spec_rv_corr/", "*s1d_A.fits"))
 
-    #Information from SIMBAD
-    result = _get_simbad_data(star=star, alerts=True)
-    print(result)
-    
+    result = _get_simbad_data(star=star, alerts=False)
+    #print(result)
+
     #run ACTIN2
-    indices = ['I_CaII', 'I_Ha06', 'I_NaI']
-    df = actin.run(files, indices) #correr só com fluxo e lambda. corrigir rv manualmente https://pyastronomy.readthedocs.io/en/latest/pyaslDoc/aslDoc/crosscorr.html. usar espetro do sol
+    indices= ['I_CaII', 'I_Ha06', 'I_NaI']
 
-    #crude sigma clipping, couldnt apply directly with astropy
-    cols = indices
-    cols.append("rv")
+    df = actin.run(files, indices, spec_kw=dict(spec_file_in="test_instrument.py"))
+    #spec, hdr = read_fits(files[0])
+    #read_spec = actin.ReadSpec(files[0],spec_file_in="test_instrument.py")
+    #wave = read_spec.spectrum['wave']
+    #flux = read_spec.spectrum['flux']
+    #wave = spec[0]; flux = spec[1]
+    #spectrum = dict(wave=wave, flux=flux)
+    #headers = dict()
+    #df = actin.CalcIndices(spectrum, headers, indices).indices
+    print(df)
+
+    df.to_csv(f"pepe_2011/results/rv_corr/df_{star}.csv")
+    
+    cols = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv']
     df = sigma_clip(df, cols, sigma=3.5)
-    df.to_csv(f"pepe_2011/results/df_{star}.csv")
 
-    #visualize RV and three different indices
-    #plot_RV_indices(star, df, indices, save=False)
-
-    #get important stats for all indices
-    stats_df = stats_indice(star,indices,df)
+    plot_RV_indices(star, df, indices, save=False)
+    stats_df = stats_indice(star,cols,df)
     print(stats_df)
-    #stats_df.to_csv(f"stats_{star}.csv")
-
+    stats_df.to_csv(f"pepe_2011/results/rv_corr/stats_{star}.csv")
+   
     for k,comb in enumerate(combinations):
         #convert I_CaII to S_MW, get B-V from SIMBAD and convert to log R_hk
         smw, smw_err = calc_smw(caii=df["I_CaII"].values, caii_err=df["I_CaII_err"].values, instr=comb[0])
@@ -99,8 +90,8 @@ for i, star in enumerate(stars_list):
             axs1[i].set_xlabel("BJD $-$ 2450000 [days]")
             axs1[i].set_title(star)
             axs1[i].legend(loc="best")
-
-#fig.savefig("log_Rhk_ACTIN_pepe2011_all_cal.png", bbox_inches="tight")
-#fig1.savefig("log_Rhk_ACTIN_pepe2011_best.png", bbox_inches="tight")
+   
+fig.savefig("pepe_2011/results/rv_corr/log_Rhk_ACTIN_pepe2011_all_cal.png", bbox_inches="tight")
+fig1.savefig("pepe_2011/results/rv_corr/log_Rhk_ACTIN_pepe2011_best.png", bbox_inches="tight")
 plt.tight_layout()
 plt.show()
