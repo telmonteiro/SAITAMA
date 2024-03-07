@@ -19,7 +19,7 @@ An additional script, in the main folder, was used:
 
 ## Second task: building a program to process any star
 
-The second task was to write a program, get_eso_spectra.py, that fetches the spectra available for a given instrument (for now HARPS, but in the future ESPRESSO and UVES) in ESO data base, filters them and downloads them. Then the program corrects the spectra by the RV, computes the activity indices with ACTIN2 and stores the results. In a more comprehensive way:
+The second task was to write a program, get_eso_spectra.py, that fetches the spectra available for a given instrument (for now HARPS, but in the future ESPRESSO and UVES) in ESO data base, filters them and downloads them. Then the program corrects the spectra by the RV, computes the activity indices with ACTIN2 and stores the results. This program also makes use of util_funcs.py. In a more comprehensive way:
 
 - Starts by quering in ESO data base the object and the instrument.
 - Checks if there is data to neglect.
@@ -31,7 +31,7 @@ The second task was to write a program, get_eso_spectra.py, that fetches the spe
 - Runs ACTIN2, obtains activity indices for CaII H\&K, H $\alpha$ at 0.6 $\mathring A$ and NaI and store the results in a data frame.
 - Saves plots of the spectra in lines of interest to check if everything is alright, as well as plots of the activity indices and the statistics related to them.
 
-This last program also makes use of util_funcs.py.
+## Problems and future work
 
 Some problems with the get_eso_spectra program are:
 
@@ -43,5 +43,5 @@ Future work:
 
 - ESPRESSO and UVES spectrographs are not yet configured
 - missing an automatic quality index, for now only way of checking bad spectra is by outliers and visual inspection of spectral lines plots
-- crashes if the star has no spectra by the instrument asked (future work)
-- does not delete the downloaded spectra after processing, leading to shortage of memory when processing several stars (future work)
+- crashes if the star has no spectra by the instrument asked
+- does not delete the downloaded spectra after processing, leading to shortage of memory when processing several stars
