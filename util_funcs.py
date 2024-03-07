@@ -3,11 +3,14 @@ import numpy as np, pandas as pd, matplotlib.pylab as plt, os, tarfile, glob
 from datetime import datetime
 from astropy.io import fits
 from PyAstronomy import pyasl
+<<<<<<< HEAD
 from astroquery.eso import Eso
 from astropy.table import Table, vstack
 from astropy.time import Time
 
 eso = Eso()
+=======
+>>>>>>> 7027be7db109bacfc28a7eb4ce945ab70db3a5e6
 
 def _get_simbad_data(star, alerts=True):
     """Get selected Simbad data for 'star'.
@@ -114,6 +117,7 @@ def stats_indice(star,cols,df):
     """
     Return pandas data frame with statistical data on the indice(s) given: max, min, mean, median, std and N (number of spectra)
     """
+<<<<<<< HEAD
     df_stats = pd.DataFrame(columns=["star","indice","max","min","mean","median","std","time_span","N_spectra"])
     if len(cols) == 1:
         row = {"star":star,"column":cols,
@@ -121,6 +125,14 @@ def stats_indice(star,cols,df):
             "mean":np.mean(df[cols]),"median":np.median(df[cols]),
             "std":np.std(df[cols]),"time_span":max(df["bjd"])-min(df["bjd"]),
             "N_spectra":len(df[cols])}
+=======
+    df_stats = pd.DataFrame(columns=["star","indice","max","min","mean","median","std","N_spectra"])
+    if len(indices) == 1:
+        row = {"star":star,"indice":indices,
+            "max":max(df[indices]),"min":min(df[indices]),
+            "mean":np.mean(df[indices]),"median":np.median(df[indices]),
+            "std":np.std(df[indices]),"N_spectra":len(df[indices])}
+>>>>>>> 7027be7db109bacfc28a7eb4ce945ab70db3a5e6
         df_stats.loc[len(df_stats)] = row
     elif len(cols) > 1:
         for i in cols:
@@ -212,6 +224,7 @@ def calc_fits_wv_1d(hdr, key_a='CRVAL1', key_b='CDELT1', key_c='NAXIS1'):
     '''
     Compute wavelength axis from keywords on spectrum header.
     '''
+<<<<<<< HEAD
     try:
         a = hdr[key_a]; b = hdr[key_b]
     except KeyError:
@@ -222,6 +235,9 @@ def calc_fits_wv_1d(hdr, key_a='CRVAL1', key_b='CDELT1', key_c='NAXIS1'):
         c = hdr["NELEM"]
 
     return a + b * np.arange(c)
+=======
+    return hdr[key_a] + hdr[key_b] * np.arange(hdr[key_c])
+>>>>>>> 7027be7db109bacfc28a7eb4ce945ab70db3a5e6
 
 ########################
 
@@ -240,6 +256,7 @@ def correct_spec_rv(wv, rv, units):
 
 ########################
 
+<<<<<<< HEAD
 def read_fits(file_name,instrument):
     '''
     Read fits file and get header and data. Varies if instrument is HARPS, ESPRESSO, UVES or FEROS. missing espresso
@@ -273,11 +290,27 @@ def read_fits(file_name,instrument):
 ########################
 
 def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, template_spec, drv, units, instrument):
+=======
+def read_fits(file_name):
+    '''
+    Read fits file and get header and data.
+    '''
+    hdul = fits.open(file_name)
+    spectrum = hdul[0].data
+    header = hdul[0].header
+    hdul.close()
+    return spectrum, header
+
+########################
+
+def get_rv_ccf(star, spectrum_filename, template_hdr, template_spec, drv, units):
+>>>>>>> 7027be7db109bacfc28a7eb4ce945ab70db3a5e6
     '''
     Uses crosscorrRV function from PyAstronomy to get the CCF of the star comparing with a spectrum of the Sun.
     Returns the BJD in days, the RV, the max value of the CCF, the list of possible RV and CC, as well as the flux and raw wavelength.
     To maximize the search for RV and avoid errors, the script searches the RV in SIMBAD and makes a reasonable interval. 
     '''
+<<<<<<< HEAD
     
     if instrument == "HARPS":
         bjd = stellar_header["HIERARCH ESO DRS BJD"] #may change with instrument
@@ -289,11 +322,31 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
 
     try:
         rv_simbad = _get_simbad_data(star=star, alerts=False)["RV_VALUE"] #just to minimize the computational cost
+=======
+    stellar_spectrum, stellar_header = read_fits(file_name=spectrum_filename)
+    bjd = stellar_header["HIERARCH ESO DRS BJD"] #may change with instrument
+
+    #get wavelength and flux of both sun (template) and star
+    w = calc_fits_wv_1d(stellar_header); f = stellar_spectrum
+    tw = calc_fits_wv_1d(template_hdr); tf = template_spec
+    
+    #tw_condition = np.logical_and(tw > 6000, tw < 6200)
+    #w_condition = np.logical_and(w > 6000, w < 6200)
+
+    #tw_new = tw[tw_condition]
+    #tf_new = tf[tw_condition]
+    #w_new = w[w_condition]
+    #f_new = f[w_condition]
+
+    try:
+        rv_simbad = _get_simbad_data(star=star, alerts=False)["RV_VALUE"]
+>>>>>>> 7027be7db109bacfc28a7eb4ce945ab70db3a5e6
         rvmin = rv_simbad - 1; rvmax = rv_simbad + 1
     except:
         rvmin = -200; rvmax = 200
 
     #get the cross-correlation
+<<<<<<< HEAD
     skipedge_values = [1000, 5000, 50000, 80000]
 
     for skipedge in skipedge_values:
@@ -304,6 +357,10 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
         except Exception as e:
             print(f"Error with skipedge={skipedge}: {e}")
             # Continue to the next iteration
+=======
+    rv, cc = pyasl.crosscorrRV(w = w, f = f, tw = tw, 
+                               tf = tf, rvmin = rvmin, rvmax = rvmax, drv = drv, skipedge = 200)
+>>>>>>> 7027be7db109bacfc28a7eb4ce945ab70db3a5e6
 
     #index of the maximum cross-correlation function
     maxind = np.argmax(cc)
@@ -313,6 +370,7 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
         radial_velocity *= 1000
         rv *= 1000
     
+<<<<<<< HEAD
     return bjd, radial_velocity, cc[maxind], np.around(rv,3), cc, w, f
 
 ########################
@@ -463,3 +521,6 @@ def select_best_spectra(spectra_table, max_spectra=200):
     print(f"Days Span: {days_span} days")
 
     return selected_spectra
+=======
+    return bjd, radial_velocity, cc[maxind], rv, cc, w, f
+>>>>>>> 7027be7db109bacfc28a7eb4ce945ab70db3a5e6
