@@ -2,6 +2,8 @@
 
 This repository's aim is to track the work done in the PEEC "The stellar activity in stars with exoplanets".
 
+## First task: case-study of Pepe et al. 2011
+
 The first task was a case-study comparing the results of $\log R'_{HK}$ for three stars in the paper Pepe et al 2011 (DOI: 10.1051/0004-6361/201117055) with the values obtained using the ACTIN2 tool (https://github.com/gomesdasilva/ACTIN2). Inside the folder "Pepe2011" are six Python scripts:
 
 - average_spec_night.py: gets average of spectra observations available in ESO archive. Fetches the paths and files, average by night of observation and saves them.
@@ -14,6 +16,8 @@ The first task was a case-study comparing the results of $\log R'_{HK}$ for thre
 An additional script, in the main folder, was used:
 
 - util_funcs_py: contains several utilitary functions used in the other scripts.
+
+## Second task: building a program to process any star
 
 The second task was to write a program, get_eso_spectra.py, that fetches the spectra available for a given instrument (for now HARPS, but in the future ESPRESSO and UVES) in ESO data base, filters them and downloads them. Then the program corrects the spectra by the RV, computes the activity indices with ACTIN2 and stores the results. In a more comprehensive way:
 
