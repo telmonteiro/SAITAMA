@@ -24,7 +24,7 @@ The second task was to write a program, get_eso_spectra.py, that fetches the spe
 - Checks if the folder for the instrument exists or not. If not creates the necessary folders.
 - According to the instrument (for now only HARPS is defined) it retrieves the data from ESO and untars the ancillary data (optional). For non-HARPS instruments, it just retrieves the data in a simple way.
 - Corrects the spectra by RV comparing the spectra to a spectrum of the Sun.
-- Runs ACTIN2, obtains activity indices for CaII H&K, H$\alpha$ at 0.6 $\AA$ and $NaI$ and store the results in a data frame.
+- Runs ACTIN2, obtains activity indices for CaII H\&K, H $\alpha$ at 0.6 $\mathring A$ and NaI and store the results in a data frame.
 - Saves plots of the spectra in lines of interest to check if everything is alright, as well as plots of the activity indices and the statistics related to them.
 
 This last program also makes use of util_funcs.py.
