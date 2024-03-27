@@ -23,25 +23,32 @@ The second task was to write a program, get_eso_spectra.py, that fetches the spe
 
 - Starts by quering in ESO data base the object and the instrument.
 - Checks if there is data to neglect.
-- Cuts the data sets by the minimum SNR chosen.
+- Cuts the data sets by the minimum and maximum SNR chosen.
 - Chooses the best SNR spectra that cover a big time span, binned by month.
 - Checks if the folder for the instrument exists or not. If not creates the necessary folders.
 - According to the instrument (for now only HARPS is defined) it retrieves the data from ESO and untars the ancillary data (optional). For non-HARPS instruments, it just retrieves the data in a simple way.
 - Corrects the spectra by RV comparing the spectra to a spectrum of the Sun.
+- Computes a quality indicator of the RV correction.
 - Runs ACTIN2, obtains activity indices for CaII H\&K, H $\alpha$ at 0.6 $\mathring A$ and NaI and store the results in a data frame.
+- Computes a periodogram using GLS to retrieve the period of $S_\text{CaII}$.
 - Saves plots of the spectra in lines of interest to check if everything is alright, as well as plots of the activity indices and the statistics related to them.
+- Saves the statistics and data frame in a fits file.
+
+For now, only the 3 stars from Pepe et al. 2011 were studied. The next step is to experiment with 15 new stars chosen from SWEET-Cat, that agree with
+- Vmag < 8
+- Declination under +30º
+- SWFlag = 1 (homogeneus parameters)
 
 ## Problems and future work
 
 Some problems with the get_eso_spectra program are:
-
-- crashes if the number of spectra is too high because of the lines plot (too much memory used)
-- maybe a better way of dealing with negative values in the flux, instead of just ignoring the spectra or replacing the point by 0
 - some way of reducing running time, as well as supressing verbose of ESO download
+- the program is not yet completed, mainly the RV correction quality indicator and the periodogram are not implemented
 
 Future work:
 
+- experiment with the 15 new stars
+
 - ESPRESSO and UVES spectrographs are not yet configured
-- missing an automatic quality index, for now only way of checking bad spectra is by outliers and visual inspection of spectral lines plots
-- crashes if the star has no spectra by the instrument asked
 - does not delete the downloaded spectra after processing, leading to shortage of memory when processing several stars
+- use calibrations to compute the age and rotation of the stars
