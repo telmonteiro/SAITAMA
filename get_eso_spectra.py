@@ -2,12 +2,8 @@ import os, glob, logging, tarfile, numpy as np, matplotlib.pyplot as plt, pandas
 from astroquery.eso import Eso
 from astropy.io import fits
 from astroquery.simbad import Simbad
-from util_funcs import get_gaiadr3, choose_snr, untar_ancillary_harps, check_downloaded_data, get_rv_ccf, read_fits, correct_spec_rv, general_fits_file
+from util_funcs import get_gaiadr3, choose_snr, untar_ancillary_harps, check_downloaded_data, get_rv_ccf, read_fits, correct_spec_rv, general_fits_file, flag_ratio_RV_corr
 from util_funcs import stats_indice, plot_RV_indices, sigma_clip, plot_line, select_best_spectra, line_ratio_indice, negative_flux_treatment, gls_periodogram
-
-import gc
-gc.collect()
-
 from actin2.actin2 import ACTIN
 actin = ACTIN()
 
@@ -87,8 +83,14 @@ def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS"
 
     return paths_download
 
-stars = ["HD192310"] #["HD20794","HD85512","HD192310"]
-instruments = ["HARPS"] # ["HARPS","ESPRESSO","FEROS","UVES"]
+#stars = ["HD192310"] #["HD20794","HD85512","HD192310"]
+
+stars = ['HD209100', 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461', 
+         'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536']
+
+#stars = ["HD108147"]
+
+instruments = ["HARPS"] # ["HARPS","ESPRESSO","FEROS","UVES"] #UVES has to be configured. the problem is with BJD
 columns = ['I_CaII', 'I_CaII_err', 'I_CaII_Rneg', 'I_Ha06', 'I_Ha06_err', 'I_Ha06_Rneg', 'I_NaI', 'I_NaI_err', 'I_NaI_Rneg',
            'bjd', 'file', 'instr', 'rv', 'obj', 'SNR'] #for df
 indices= ['I_CaII', 'I_Ha06', 'I_NaI'] #indices for activity
@@ -96,7 +98,7 @@ max_snr_instr = {"HARPS":550,"ESPRESSO":1000,"FEROS":1000,"UVES":550} #max SNR t
 
 #maximum spectra to be selected, as well as the minimum overall SNR
 max_spectra = 150
-min_snr = 40
+min_snr = 15
 
 download = False
 
@@ -149,7 +151,7 @@ def main():
 
             files = glob.glob(os.path.join(f"teste_download/{target_save_name}/{target_save_name}_{instr}/ADP", "ADP*.fits"))
             files_tqdm = tqdm.tqdm(files)
-            sun_template_wv, sun_template_flux, sun_header = read_fits(file_name="Sun1000.fits",instrument=None) #template spectrum for RV correction
+            sun_template_wv, sun_template_flux, sun_header = read_fits(file_name="Sun1000.fits",instrument=None, mode=None) #template spectrum for RV correction
             
             #creates folders to save the rv corrected fits files
             folder_path = f"teste_download_rv_corr/{target_save_name}/{target_save_name}_{instr}/"
@@ -163,7 +165,7 @@ def main():
             for i,file in enumerate(files_tqdm):
                 time.sleep(0.01)
 
-                wv, f, hdr = read_fits(file,instr)
+                wv, f, hdr = read_fits(file,instr,mode="raw")
 
                 #value = negative_flux_treatment(f, method="skip") #method can be "zero_pad"
 
@@ -185,17 +187,34 @@ def main():
                 #run ACTIN2
                 spectrum = dict(wave=wv_corr, flux=f)
                 SNR = hdr["SNR"]
-                headers = {"bjd":bjd,"file":file,"instr":instr,"rv":radial_velocity,"obj":target_save_name,"SNR":SNR}
+                #flag for goodness of RV correction  
+                flag_ratio, flag_list = flag_ratio_RV_corr([file_path],instr)
+                flag = flag_list[0]
+
+                headers = {"bjd":bjd,"file":file,"instr":instr,"rv":radial_velocity,"obj":target_save_name,"SNR":SNR, "RV_flag":flag}
                 df_ind = actin.CalcIndices(spectrum, headers, indices).indices
                 df = df.append(pd.DataFrame([{**df_ind, **headers}]), ignore_index=True,sort=True)
                           
-            t_span = max(df["bjd"])-min(df["bjd"])
-            n_spec = len(df)
-            if n_spec >= 20 and t_span >= 1.5*365:  #only compute periodogram if star has at least 20 spectra in a time span of at least 1.5 years
-                period, period_err = gls_periodogram(target_save_name, df["I_CaII"],df["I_CaII_err"],df["bjd"], print_info = False,
-                                         save=True, path_save=folder_path+f"{target_save_name}_GLS.png")
-                print(f"Period of I_CaII: {period} +/- {period_err} days")
-            else: period = None; period_err = None 
+            #print(df)
+            df.to_csv(folder_path+f"df_{target_save_name}_{instr}.csv",index=False) #save before sigma clip
+
+            #flag for goodness of RV correction     
+            flag_col = np.array(df["RV_flag"])
+            good_spec_ind = np.where((flag_col == 0))
+            N_good_spec = len(flag_col[good_spec_ind])
+            flag_ratio = N_good_spec / len(flag_col)  
+            bad_spec_indices = np.where(flag_col == 1)[0]
+            df = df.drop(labels=list(bad_spec_indices))
+            #print(df)
+            #print(len(df["RV_flag"]))
+            # Write to a text file
+            with open(f"flag_ratios_{instr}.txt", "a") as f:
+                f.write("##########################\n")
+                f.write(f"Star: {target_save_name}\n")
+                f.write(f"Flag ratio: {flag_ratio}\n")
+                if flag_ratio != 1:
+                    for index in bad_spec_indices:
+                        f.write(f"Bad spectrum: {files[index]}\n")
 
             #plot the wavelength of known lines to check if RV correction is good
             for line in ["Ha","CaIIH","CaIIK","FeII","NaID1","NaID2","HeI","CaI"]:
@@ -204,28 +223,35 @@ def main():
                 plt.savefig(folder_path+f"{target_save_name}_{instr}_{line}.png", bbox_inches="tight")
                 plt.clf()
 
-            #flag = line_ratio_indice(data=data_array, line="Ha")
-            #if len(flag) != 0:
-            #    print(f"Ratio flux/continuum > 0.5 detected in spectrum numbers {flag}")
-            #    print(f"Spectrum names: {np.array(files)[flag]}")
-
-            #print(df)
-            df.to_csv(folder_path+f"df_{target_save_name}_{instr}.csv",index=False) #save before sigma clip
+            cols = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv']
+            df = sigma_clip(df, cols, sigma=3)
 
             plt.figure(3)
             plot_RV_indices(target_save_name, df, indices, save=True, 
             path_save = folder_path+f"{target_save_name}_{instr}.png")
             #plt.show()
 
-            cols = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv']
-            df = sigma_clip(df, cols, sigma=3)
+
+            ind_I_CaII_Rneg = df[df["I_CaII_Rneg"] < 0.01].index
+            I_CaII_extracted = df.loc[ind_I_CaII_Rneg, "I_CaII"]
+            I_CaII_err_extracted = df.loc[ind_I_CaII_Rneg, "I_CaII_err"]
+            bjd_extracted = df.loc[ind_I_CaII_Rneg, "bjd"]
+            t_span = max(bjd_extracted)-min(bjd_extracted)
+            n_spec = len(I_CaII_err_extracted)
+            if n_spec >= 30 and t_span >= 2*365:  #only compute periodogram if star has at least 30 spectra in a time span of at least 2 years
+                period, period_err = gls_periodogram(target_save_name, I_CaII_extracted, I_CaII_err_extracted, bjd_extracted, 
+                                                     print_info = False, mode = "Period",
+                                         save=True, path_save=folder_path+f"{target_save_name}_GLS.png")
+                plt.clf()
+                print(f"Period of I_CaII: {period} +/- {period_err} days")
+            else: period = 0; period_err = 0 
 
             stats_df = stats_indice(target_save_name,cols,df)
             print(stats_df)
             stats_df.to_csv(folder_path+f"stats_{target_save_name}.csv")          
 
             file_path = folder_path+f"df_stats_{target_save_name}.fits"
-            general_fits_file(data_array, stats_df, df, file_path, min_snr, max_snr, instr, rv, period, period_err)
+            general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_ratio)
             
             #shutil.rmtree(f"teste_download/{target_save_name}/")  #remove original fits files
 

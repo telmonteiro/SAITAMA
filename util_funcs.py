@@ -1,6 +1,6 @@
 from __future__ import print_function, division
 from astroquery.simbad import Simbad
-import numpy as np, pandas as pd, matplotlib.pylab as plt, os, tarfile, glob
+import numpy as np, pandas as pd, matplotlib.pylab as plt, os, tarfile, glob, math
 from astropy.io import fits
 from PyAstronomy import pyasl
 from astroquery.eso import Eso
@@ -126,10 +126,9 @@ def stats_indice(star,cols,df):
     elif len(cols) > 1:
         for i in cols:
             if i != "rv":
-                indices = df[df[i+"_Rneg"] < 0.001].index
+                indices = df[df[i+"_Rneg"] < 0.01].index
                 data = df.loc[indices, i]
-            else:
-                data = df[i]
+            else: data = df["rv"]
             row = {"star": star, "indice": i,
                    "max": max(data), "min": min(data),
                    "mean": np.mean(data), "median": np.median(data),
@@ -264,6 +263,8 @@ def read_fits(file_name,instrument,mode):
                 header = hdul[0].header
                 header["HIERARCH ESO DRS BJD"] = bjd
         elif mode == "rv_corrected":
+            #print(hdul)
+            #print(hdul.info())
             wv = hdul[0].data[0]
             flux = hdul[0].data[1]
             header = hdul[0].header
@@ -271,7 +272,10 @@ def read_fits(file_name,instrument,mode):
     elif instrument == "UVES" or instrument == "FEROS":
         wv = hdul[1].data[0][0]
         flux = hdul[1].data[0][1]
-        header = hdul[1].header
+        header = hdul[0].header
+        bjd = hdul[0].header["HIERARCH ESO DRS BJD"]
+        header = hdul[0].header
+        header["HIERARCH ESO DRS BJD"] = bjd
     
     else:
         flux = hdul[0].data
@@ -446,10 +450,10 @@ def plot_line(data, line, lstyle = "-"):
         #flux_normalized = flux/np.linalg.norm(flux)
         flux_normalized = (flux-np.min(flux))/(np.max(flux)-np.min(flux))
         plt.plot(wv, flux_normalized, lstyle)
-        plt.axvline(x=wv[19],ymin=0,ymax=1,ls="--",ms=0.2)
-        plt.axvline(x=wv[-19],ymin=0,ymax=1,ls="--",ms=0.2)
-        plt.axvline(x=line_wv-window/30,ymin=0,ymax=1,ls="--",ms=0.2)
-        plt.axvline(x=line_wv+window/30,ymin=0,ymax=1,ls="--",ms=0.2)
+        plt.axvline(x=wv[19],ymin=0,ymax=1,ls="--",ms=0.1)
+        plt.axvline(x=wv[-19],ymin=0,ymax=1,ls="--",ms=0.1)
+        plt.axvline(x=line_wv-window/30,ymin=0,ymax=1,ls="--",ms=0.1)
+        plt.axvline(x=line_wv+window/30,ymin=0,ymax=1,ls="--",ms=0.1)
 
     plt.axvline(x=line_wv,ymin=0,ymax=1,ls="-",ms=0.2)
     
@@ -517,33 +521,72 @@ def select_best_spectra(spectra_table, max_spectra=200):
 
 def line_ratio_indice(data, line="CaI"):
     '''
-    Computes a ratio  between the continuum and line flux of a reference line to check if everything is alright.
+    Computes a ratio between the continuum and line flux of a reference line to check if everything is alright.
     '''
-    lines_list = {"CaIIK":3933.664,"CaIIH":3968.47,"Ha":6562.808,"NaID1":5895.92,
-             "NaID2":5889.95,"HeI":5875.62,"CaI":6572.795,"FeII":6149.240}
+    lines_list = {"CaIIK":3933.664,"CaIIH":3968.47,"Ha":6562.808,"NaID1":5895.92,"NaID2":5889.95,"HeI":5875.62,"CaI":6572.795,"FeII":6149.240}
     line_wv = lines_list[line]
     
     if line in ["CaIIK","CaIIH"]: window = 12
     elif line in ["Ha","NaID1","NaID2"]: window = 2
-    else: window = 1 
+    else: window = 0.6
 
-    flag_ind = []
-    for i,array in enumerate(data):
-        wv = array[0]; flux = array[1]
+    ratio_arr = np.zeros(len(data)); center_flux_line_arr = np.zeros(len(data)); flux_continuum_arr = np.zeros(len(data)) 
+
+    for i in range(len(data)):
+        wv = data[i][0]; flux = data[i][1]
         wv_array = np.where((line_wv-window < wv) & (wv < line_wv+window))
         wv = wv[wv_array]
         flux = flux[wv_array]
-        flux_normalized = flux/np.linalg.norm(flux)
+        #flux_normalized = flux/np.linalg.norm(flux)
+        flux_normalized = (flux-np.min(flux))/(np.max(flux)-np.min(flux))
 
-        flux_left = flux_normalized[0]
-        flux_right = flux_normalized[-1]
-        flux_continuum = (flux_left+flux_right)/2 #mean
-        flux_line = min(flux_normalized)
-        ratio = flux_line/flux_continuum
-        if ratio > 0.5:
-            flag_ind.append(i)
+        flux_left = np.median(flux_normalized[:20])
+        flux_right = np.median(flux_normalized[:-20])
+        flux_continuum = np.median([flux_left,flux_right]) #median
+        #print("Flux continuum: ",flux_continuum)
         
-    return flag_ind
+        wv_center_line = np.where((line_wv-window/30 < wv) & (wv < line_wv+window/30))
+        flux_line = flux_normalized[wv_center_line]
+        center_flux_line = np.median(flux_line)
+        #print("Flux center line: ",center_flux_line)
+
+        ratio = center_flux_line/flux_continuum 
+
+        ratio_arr[i] = ratio
+        center_flux_line_arr[i] = center_flux_line
+        flux_continuum_arr[i] = flux_continuum
+         
+    return ratio_arr, center_flux_line_arr, flux_continuum_arr
+
+
+def flag_ratio_RV_corr(files,instr):
+    '''
+    For each spectrum, run an interval of offsets and if the minimum ratio is not in [-0.02,0.02], raises a flag = 1.
+    Flag = 0 is for good spectra. Then the flag ratio #0/#total is computed
+    '''
+    offset_list = np.linspace(-1,1,1001)
+    flag_list = np.zeros((len(files)))
+
+    for i,file in enumerate(files):
+        wv, flux, hdr = read_fits(file,instrument=instr,mode="rv_corrected")
+        #if i == 0: wv += 0.2 #just to fake a bad spectrum
+        ratio_list = np.zeros_like(offset_list)
+        for j,offset in enumerate(offset_list):
+            ratio_arr, center_flux_line_arr, flux_continuum_arr = line_ratio_indice([(wv+offset,flux)], line="CaI")
+            ratio_list[j]=ratio_arr
+
+        min_ratio_ind = np.argmin(ratio_list)
+        offset_min = offset_list[min_ratio_ind]
+        #print(offset_min)
+        if offset_min < -0.03 or offset_min > 0.03:
+            flag_list[i] = 1
+        else: flag_list[i] = 0
+
+    good_spec_ind = np.where((flag_list == 0))
+    N_good_spec = len(flag_list[good_spec_ind])
+    flag_ratio = N_good_spec / len(flag_list)
+
+    return flag_ratio, flag_list
 
 #################################
 
@@ -567,12 +610,14 @@ def negative_flux_treatment(f, method):
     
 #################################
     
-def general_fits_file(data_array, stats_df, df, folder_path, min_snr, max_snr, instr, period, period_err):
+def general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_ratio):
     '''
     Takes the data array that consists in a 3D cube containing the wavelength and flux for each spectrum used and
     the data frame with the statistics.
     '''
     hdr = fits.Header() 
+
+    if math.isnan(float(period_err)): period_err = 0
 
     star_id = stats_df["star"][0]; time_span = stats_df["time_span"][0]; N_spectra = stats_df["N_spectra"][0]
     dict_hdr = {"STAR_ID":[star_id,'Star ID in HD catalogue'],
@@ -583,8 +628,9 @@ def general_fits_file(data_array, stats_df, df, folder_path, min_snr, max_snr, i
                 "SNR_MAX":[max_snr,"Maximum SNR"],
                 "PERIOD_I_CaII":[period,"Period of CaII activity index"],
                 "PERIOD_I_CaII_ERR":[period_err,"Error of period of CaII activity index"],
+                "FLAG_RV":[flag_ratio,"Goodness of RV correction indicador. 1 = all good"],
                 "COMMENT":["Spectra based on SNR - time span trade-off","Comment"],
-                "COMMENT1":["RV obtained from CCF measure","Comment"],
+                "COMMENT1":["RV obtained from CCF measure (m/s)","Comment"],
                 "COMMENT2":["3D data of wv (Angs) and flux of each spectrum","Comment"]}
 
     indices = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv']
@@ -600,26 +646,17 @@ def general_fits_file(data_array, stats_df, df, folder_path, min_snr, max_snr, i
     for keyword in dict_hdr.keys():
         hdr.append(("HIERARCH "+keyword, dict_hdr[keyword][0], dict_hdr[keyword][1]), end=True)
 
-    #hdu = fits.PrimaryHDU(data_array, header=hdr) #CAN'T SAVE THE DATA ARRAY BECAUSE IT'S A LIST WITH ARRAYS OF DIFFERENT SIZES INSIDE REEEEE
+    df.columns = df.columns.astype(str)
+    table = Table.from_pandas(df)
+    hdul = fits.BinTableHDU(data=table, header=hdr)
 
-    # Assuming 'df' is your DataFrame
-    #numeric_df = df.select_dtypes(include=['float64', 'int64'])  # Select numeric columns
-
-    # Convert the DataFrame to an Astropy Table
-    #table = Table.from_pandas(numeric_df)
-
-    hdu = fits.PrimaryHDU(header=hdr)
-    hdul = fits.HDUList([hdu])
-
-    hdul.writeto(f"{folder_path}", overwrite=True)
-    hdul.close()
+    hdul.writeto(file_path, overwrite=True)
 
 #################################
     
-def gls_periodogram(star, I_CaII, I_CaII_err, bjd, print_info, save, path_save):
+def gls_periodogram(star, I_CaII, I_CaII_err, bjd, print_info, mode, save, path_save):
     # Compute the GLS periodogram with default options. Choose Zechmeister-Kuerster normalization explicitly
-    clp = pyPeriod.Gls((bjd - 2450000, I_CaII, I_CaII_err), norm="ZK", verbose=print_info,
-                       Pbeg=3000, Pend=4000,ofac=30)
+    clp = pyPeriod.Gls((bjd - 2450000, I_CaII, I_CaII_err), norm="ZK", verbose=print_info,ofac=30)
     dic_clp = clp.info(noprint=True)
     period = dic_clp["best_sine_period"]
     period_err = dic_clp["best_sine_period_err"]
@@ -633,14 +670,20 @@ def gls_periodogram(star, I_CaII, I_CaII_err, bjd, print_info, save, path_save):
 
     # and plot power vs. frequency.
     plt.subplot(1, 2, 1)
-    plt.xlabel("Period"); plt.ylabel("Power")
-    plt.title("Power vs Frequency for GLS Periodogram")
-    plt.plot(1/clp.freq, clp.power, 'b-')
+    if mode == "Period":
+        plt.xlabel("Period [days]")
+        x_axis = 1/clp.freq
+        plt.xlim([0, period+2000])
+    elif mode == "Frequency":
+        plt.xlabel("Frequency [1/days]")
+        x_axis = clp.freq
+    plt.ylabel("Power")
+    plt.title(f"Power vs {mode} for GLS Periodogram")
+    plt.plot(x_axis, clp.power, 'b-')
     # Add the FAP levels to the plot
     for i in range(len(fapLevels)):
-        plt.plot([min(clp.freq), max(clp.freq)], [plevels[i]]*2, '--',
+        plt.plot([min(x_axis), max(x_axis)], [plevels[i]]*2, '--',
                 label="FAP = %4.1f%%" % (fapLevels[i]*100))
-    plt.xlim([100, 5000])
     plt.legend()
 
     plt.subplot(1, 2, 2)

@@ -49,7 +49,7 @@ def gls_periodogram(star, I_CaII, I_CaII_err, bjd, print_info, mode, save, path_
 
     return round(period,3), round(period_err,3)
 
-target_save_name = "HD192310"
+target_save_name = "HD46375"
 instr = "HARPS"
 folder_path = f"teste_download_rv_corr/{target_save_name}/{target_save_name}_{instr}/"
 file_path = folder_path+f"df_stats_{target_save_name}.fits"
