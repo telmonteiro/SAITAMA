@@ -39,16 +39,15 @@ For now, only the 3 stars from Pepe et al. 2011 were studied. The next step is t
 - Declination under +30º
 - SWFlag = 1 (homogeneus parameters)
 
+The resulting list of stars is:  ['HD209100', 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461','HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536']
+HD47536 was particularly chosen because it has a low number of spectra available, so it acts as a test. For now the experimentation is ongoing with HARPS spectra, but the next step is with UVES.
+
 ## Problems and future work
 
 Some problems with the get_eso_spectra program are:
 - some way of reducing running time, as well as supressing verbose of ESO download
-- the program is not yet completed, mainly the RV correction quality indicator and the periodogram are not implemented
 
 Future work:
-
-- experiment with the 15 new stars
-
 - ESPRESSO and UVES spectrographs are not yet configured
 - does not delete the downloaded spectra after processing, leading to shortage of memory when processing several stars
 - use calibrations to compute the age and rotation of the stars
