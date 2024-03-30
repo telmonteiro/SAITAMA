@@ -14,7 +14,7 @@ def stats_indice(star,cols,df):
             df_stats.loc[len(df_stats)] = row
     elif len(cols) > 1:
         for i in cols:
-            indices = df[df[i+"_Rneg"] < 0.001].index
+            indices = df[df[i+"_Rneg"] < 0.01].index
             data = df.loc[indices, i]
             row = {"star": star, "indice": i,
                    "max": max(data), "min": min(data),

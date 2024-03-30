@@ -9,11 +9,11 @@ def general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, 
     '''
     hdr = fits.Header() 
 
-    star_id = stats_df["star"][0]; time_span = stats_df["time_span"][0]; N_spectra = stats_df["N_spectra"][0]
+    star_id = stats_df["star"][0]; time_span = stats_df["time_span"][0]; #N_spectra = stats_df["N_total_spectra"][0]
     dict_hdr = {"STAR_ID":[star_id,'Star ID in HD catalogue'],
                 "INSTR":[instr,"Instrument used"],
                 "TIME_SPAN":[time_span, 'Time span in days between first and last observations used'],
-                "N_SPECTRA":[N_spectra,"Number of spectra used"],
+                #"N__TOTAL_SPECTRA":[N_spectra,"Number of spectra used before indice calculation"],
                 "SNR_MIN":[min_snr,"Minimum SNR"],
                 "SNR_MAX":[max_snr,"Maximum SNR"],
                 "PERIOD_I_CaII":[period,"Period of CaII activity index"],
@@ -23,12 +23,13 @@ def general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, 
                 "COMMENT2":["3D data of wv (Angs) and flux of each spectrum","Comment"]}
 
     indices = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv']
-    stats = ["max","min","mean","median","std"]
+    stats = ["max","min","mean","median","std","N_spectra"]
 
     for i,ind in enumerate(indices):
         for col in stats:
             stat = stats_df[col][i]
             if col == "rv": comment = f"{col} of {ind.upper()} (m/s)"
+            elif col == "N_spectra": comment = f"Nr of spectra used in {ind}"
             else: comment = f"{col} of {ind}"
             dict_hdr[ind.upper()+"_"+col.upper()] = [stat,comment]
     
@@ -68,3 +69,4 @@ general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, peri
 df, hdr = read_bintable(file=file_path,print_info=False)
 print(df)
 print(df.columns)
+print(hdr)
