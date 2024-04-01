@@ -2,8 +2,8 @@ import os, glob, logging, tarfile, numpy as np, matplotlib.pyplot as plt, pandas
 from astroquery.eso import Eso
 from astropy.io import fits
 from astroquery.simbad import Simbad
-from util_funcs import get_gaiadr3, choose_snr, untar_ancillary_harps, check_downloaded_data, get_rv_ccf, read_fits, correct_spec_rv, general_fits_file, flag_ratio_RV_corr
-from util_funcs import stats_indice, plot_RV_indices, sigma_clip, plot_line, select_best_spectra, line_ratio_indice, negative_flux_treatment, gls_periodogram
+from util_funcs import get_gaiadr3, choose_snr, check_downloaded_data, get_rv_ccf, read_fits, correct_spec_rv, general_fits_file, flag_ratio_RV_corr
+from util_funcs import stats_indice, plot_RV_indices, sigma_clip, plot_line, select_best_spectra, line_ratio_indice, gls_periodogram
 from actin2.actin2 import ACTIN
 actin = ACTIN()
 
@@ -31,8 +31,15 @@ def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS"
     print("Searching: ", search_name)
 
     tbl_search = eso.query_surveys(instrument, target=search_name, box=box)
+
     if tbl_search is None:
         return "None"
+    
+    if instrument == "UVES":
+        wav_lim_min = np.array([int(float(wav.split("..")[0]))*10 for wav in tbl_search["Wavelength"]])
+        wav_lim_max = np.array([int(float(wav.split("..")[1]))*10 for wav in tbl_search["Wavelength"]])
+        ind_wav_lim = np.where((wav_lim_min < 6400) & (wav_lim_max > 6600))
+        tbl_search = tbl_search[ind_wav_lim]
 
     # Removing eventually detected manually bad data
     if name_target in neglect_data.keys():
@@ -85,12 +92,11 @@ def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS"
 
 #stars = ["HD192310"] #["HD20794","HD85512","HD192310"]
 
-stars = ['HD209100', 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461', 
-         'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536']
+#stars = ['HD209100', 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461', 
+#         'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536']
+stars = ['HD179949', 'HD47536']
 
-#stars = ["HD108147"]
-
-instruments = ["HARPS"] # ["HARPS","ESPRESSO","FEROS","UVES"] #UVES has to be configured. the problem is with BJD
+instruments = ["UVES"] # ["HARPS","ESPRESSO","FEROS","UVES"] #UVES has to be configured. the problem is with BJD
 columns = ['I_CaII', 'I_CaII_err', 'I_CaII_Rneg', 'I_Ha06', 'I_Ha06_err', 'I_Ha06_Rneg', 'I_NaI', 'I_NaI_err', 'I_NaI_Rneg',
            'bjd', 'file', 'instr', 'rv', 'obj', 'SNR'] #for df
 indices= ['I_CaII', 'I_Ha06', 'I_NaI'] #indices for activity
@@ -100,7 +106,7 @@ max_snr_instr = {"HARPS":550,"ESPRESSO":1000,"FEROS":1000,"UVES":550} #max SNR t
 max_spectra = 150
 min_snr = 15
 
-download = False
+download = True
 
 ### Main program:
 def main():
@@ -150,6 +156,8 @@ def main():
                     pass #skip to next instrument if there are no observations with the present one
 
             files = glob.glob(os.path.join(f"teste_download/{target_save_name}/{target_save_name}_{instr}/ADP", "ADP*.fits"))
+            if len(files) == 0:
+                continue
             files_tqdm = tqdm.tqdm(files)
             sun_template_wv, sun_template_flux, sun_header = read_fits(file_name="Sun1000.fits",instrument=None, mode=None) #template spectrum for RV correction
             
@@ -221,39 +229,42 @@ def main():
                 plt.figure(2)
                 plot_line(data=data_array, line=line)
                 plt.savefig(folder_path+f"{target_save_name}_{instr}_{line}.png", bbox_inches="tight")
-                plt.clf()
+                plt.clf()  
 
-            cols = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv']
-            df = sigma_clip(df, cols, sigma=3)
+            if flag_ratio > 0:
+                cols = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv']
+                df = sigma_clip(df, cols, sigma=3)
 
-            plt.figure(3)
-            plot_RV_indices(target_save_name, df, indices, save=True, 
-            path_save = folder_path+f"{target_save_name}_{instr}.png")
-            #plt.show()
+                plt.figure(3)
+                plot_RV_indices(target_save_name, df, indices, save=True, 
+                path_save = folder_path+f"{target_save_name}_{instr}.png")
+                #plt.show()
 
+                ind_I_CaII_Rneg = df[df["I_CaII_Rneg"] < 0.01].index
+                I_CaII_extracted = df.loc[ind_I_CaII_Rneg, "I_CaII"]
+                I_CaII_err_extracted = df.loc[ind_I_CaII_Rneg, "I_CaII_err"]
+                bjd_extracted = df.loc[ind_I_CaII_Rneg, "bjd"]
+                try:
+                    t_span = max(bjd_extracted)-min(bjd_extracted)
+                    n_spec = len(I_CaII_err_extracted)
+                except:
+                    n_spec = 0
+                if n_spec >= 30 and t_span >= 2*365:  #only compute periodogram if star has at least 30 spectra in a time span of at least 2 years
+                    period, period_err = gls_periodogram(target_save_name, I_CaII_extracted, I_CaII_err_extracted, bjd_extracted, 
+                                                        print_info = False, mode = "Period",
+                                            save=True, path_save=folder_path+f"{target_save_name}_GLS.png")
+                    plt.clf()
+                    print(f"Period of I_CaII: {period} +/- {period_err} days")
+                else: period = 0; period_err = 0 
 
-            ind_I_CaII_Rneg = df[df["I_CaII_Rneg"] < 0.01].index
-            I_CaII_extracted = df.loc[ind_I_CaII_Rneg, "I_CaII"]
-            I_CaII_err_extracted = df.loc[ind_I_CaII_Rneg, "I_CaII_err"]
-            bjd_extracted = df.loc[ind_I_CaII_Rneg, "bjd"]
-            t_span = max(bjd_extracted)-min(bjd_extracted)
-            n_spec = len(I_CaII_err_extracted)
-            if n_spec >= 30 and t_span >= 2*365:  #only compute periodogram if star has at least 30 spectra in a time span of at least 2 years
-                period, period_err = gls_periodogram(target_save_name, I_CaII_extracted, I_CaII_err_extracted, bjd_extracted, 
-                                                     print_info = False, mode = "Period",
-                                         save=True, path_save=folder_path+f"{target_save_name}_GLS.png")
-                plt.clf()
-                print(f"Period of I_CaII: {period} +/- {period_err} days")
-            else: period = 0; period_err = 0 
+                stats_df = stats_indice(target_save_name,cols,df)
+                print(stats_df)
+                stats_df.to_csv(folder_path+f"stats_{target_save_name}.csv")          
 
-            stats_df = stats_indice(target_save_name,cols,df)
-            print(stats_df)
-            stats_df.to_csv(folder_path+f"stats_{target_save_name}.csv")          
-
-            file_path = folder_path+f"df_stats_{target_save_name}.fits"
-            general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_ratio)
-            
-            #shutil.rmtree(f"teste_download/{target_save_name}/")  #remove original fits files
+                file_path = folder_path+f"df_stats_{target_save_name}.fits"
+                general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_ratio)
+                
+                #shutil.rmtree(f"teste_download/{target_save_name}/")  #remove original fits files
 
 if __name__ == "__main__":
     main()

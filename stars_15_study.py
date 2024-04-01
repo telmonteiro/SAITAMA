@@ -14,8 +14,10 @@ keys = ['TIME_SPAN', 'N_SPECTRA', 'SNR_MIN', 'SNR_MAX', 'FLAG_RV', 'PERIOD_I_CaI
 final_df = pd.DataFrame()
 
 for star in stars:
-    file = glob.glob(os.path.join(f"teste_download_rv_corr/{star}/{star}_HARPS/", f"df_stats_{star}.fits"))[0]
-    df, hdr = read_bintable(file, print_info=False)
+    file = glob.glob(os.path.join(f"teste_download_rv_corr/{star}/{star}_UVES/", f"df_stats_{star}.fits"))
+    if file == []: continue
+    print(file)
+    df, hdr = read_bintable(file[0], print_info=False)
 
     values = {}
     for key, value in hdr.items():
@@ -33,7 +35,7 @@ final_df.reset_index(inplace=True)
 final_df.rename(columns={"index": "STAR_ID"}, inplace=True)
 print(final_df)
 
-final_df.to_csv("df_15_stars_stats.csv")
+final_df.to_csv("df_15_stars_stats_UVES.csv")
 
 '''
 stars where GLS periodogram is not reliable: 
@@ -64,5 +66,9 @@ value should be attained (periods lower than 1.5 years (HD160691, HD46375, HD134
 there is too many spectra in the space of one day. for example, if a given day has 15 spectra that have good SNR, they may be chosen
 in detriment of good time span, inserting a bias in the time distribution of spectra and leading to no good period computed
 (HD108147, HD102365, for example)
+
+For UVES:
+Only HD13445 didnt have all spectra negged, and the values of I_Ha06 and I_NaI seem consistent with the HARPS values...
+very weird that for the other stars ALL the spectra gave RV_Flag = 1
 
 '''

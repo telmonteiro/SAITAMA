@@ -129,75 +129,27 @@ def stats_indice(star,cols,df):
                 indices = df[df[i+"_Rneg"] < 0.01].index
                 data = df.loc[indices, i]
             else: data = df["rv"]
-            row = {"star": star, "indice": i,
-                   "max": max(data), "min": min(data),
-                   "mean": np.mean(data), "median": np.median(data),
-                   "std": np.std(data), "time_span": max(df["bjd"]) - min(df["bjd"]),
-                   "N_spectra": len(data)}
-            df_stats.loc[len(df_stats)] = row
+            if len(data) != 0:
+                row = {"star": star, "indice": i,
+                    "max": max(data), "min": min(data),
+                    "mean": np.mean(data), "median": np.median(data),
+                    "std": np.std(data), "time_span": max(df["bjd"]) - min(df["bjd"]),
+                    "N_spectra": len(data)}
+                df_stats.loc[len(df_stats)] = row
+            else: 
+                row = {"star": star, "indice": i,
+                    "max": 0, "min": 0,
+                    "mean": 0, "median": 0,
+                    "std": 0, "time_span": max(df["bjd"]) - min(df["bjd"]),
+                    "N_spectra": len(data)}
+                df_stats.loc[len(df_stats)] = row
+
 
     else:
         print("ERROR: No columns given")
         df_stats = None
     
     return df_stats
-
-#########################
-
-def find_s1d_A(directory):
-    """
-    Find files inside folders that match the requirement (s1d_A)
-    """
-    file_paths = []
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith("s1d_A.fits"):
-                file_path = os.path.join(root, file)
-                file_paths.append(file_path)
-    return file_paths
-
-########################
-
-def create_average_spectrum(folder_path, extension, files):
-    '''
-    This function creates an average spectrum per day. It has two kind of paths because it is used two times, with a difference:
-        - fits files are stored in the main folder of the star (before data/reduced)
-        - fits files are stored in the data/reduced folder
-    I don't know why it happens but it seems that the data/reduced files are the most recent ones, 2010-
-    '''
-    if files == None:
-        files = [f for f in os.listdir(folder_path) if f.endswith("{}.fits".format(extension))]
-
-    if not files:
-        print(f"No {extension} fits files found in {folder_path}")
-        return 0,0
-
-    #header of first observation. using the first obs as the final header just because it is easier
-    with fits.open(os.path.join(folder_path, files[0])) as hdul: 
-        hdr = hdul[0].header
-        date_bjd = np.around(hdr["HIERARCH ESO DRS BJD"])
-        hdr["HIERARCH ESO DRS BJD"] == date_bjd
-
-    #load each data and pad or truncate to a common length
-    data_list = [fits.getdata(os.path.join(folder_path, file), ext=0) for file in files]
-    #make sure all arrays have same shape
-    min_shape = min(data.shape for data in data_list)
-    
-    if files == None:
-        #check if the arrays are 1D or 2D
-        if len(min_shape) == 1: 
-            data_padded = np.array([data[:min_shape[0]] for data in data_list])
-        elif len(min_shape) == 2:
-            data_padded = np.array([data[:min_shape[0], :min_shape[1]] for data in data_list])
-        else:
-            print("Unexpected dimensionality in the data.")
-    else:
-        data_padded = np.array([data[:min_shape[0]] for data in data_list])
-
-    #compute average data
-    avg_data = np.mean(data_padded, axis=0)
-
-    return avg_data, hdr
 
 ########################
 
@@ -206,9 +158,10 @@ def sigma_clip(df, cols, sigma):
     Rough sigma clipping of a data frame.
     '''
     for col in cols:
-        mean= df[col].mean()
-        std = df[col].std()
-        df = df[(df[col] >= mean - sigma * std) & (df[col] <= mean + sigma * std)]
+        if math.isnan(df[col][0]) == False:
+            mean= df[col].mean()
+            std = df[col].std()
+            df = df[(df[col] >= mean - sigma * std) & (df[col] <= mean + sigma * std)]
     return df
 
 ########################
@@ -269,13 +222,17 @@ def read_fits(file_name,instrument,mode):
             flux = hdul[0].data[1]
             header = hdul[0].header
 
-    elif instrument == "UVES" or instrument == "FEROS":
-        wv = hdul[1].data[0][0]
-        flux = hdul[1].data[0][1]
-        header = hdul[0].header
-        bjd = hdul[0].header["HIERARCH ESO DRS BJD"]
-        header = hdul[0].header
-        header["HIERARCH ESO DRS BJD"] = bjd
+    elif instrument == "UVES":
+        if mode == "raw":
+            header = hdul[0].header
+            wv = hdul[1].data[0][0]
+            flux = hdul[1].data[0][1]
+            bjd = hdul[0].header["MJD-OBS"]+2400000.5
+            header["HIERARCH ESO DRS BJD"] = bjd
+        elif mode == "rv_corrected":
+            wv = hdul[0].data[0]
+            flux = hdul[0].data[1]
+            header = hdul[0].header
     
     else:
         flux = hdul[0].data
@@ -286,7 +243,6 @@ def read_fits(file_name,instrument,mode):
     return wv, flux, header
 
 ########################
-
 def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, template_spec, drv, units, instrument):
     '''
     Uses crosscorrRV function from PyAstronomy to get the CCF of the star comparing with a spectrum of the Sun.
@@ -294,7 +250,7 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
     To maximize the search for RV and avoid errors, the script searches the RV in SIMBAD and makes a reasonable interval. 
     '''
     
-    if instrument == "HARPS":
+    if instrument == "HARPS" or instrument == "UVES":
         bjd = stellar_header["HIERARCH ESO DRS BJD"] #may change with instrument
     else: bjd = None
 
@@ -302,22 +258,29 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
     w = stellar_wv; f = stellar_flux
     tw = calc_fits_wv_1d(template_hdr); tf = template_spec
 
+    #to make the two spectra compatible, cut the stellar one
+    w_ind_common = np.where((w < np.max(tw)) & (w > np.min(tw)))
+    w_cut = w[w_ind_common]
+    f_cut = f[w_ind_common]
+
     try:
         rv_simbad = _get_simbad_data(star=star, alerts=False)["RV_VALUE"] #just to minimize the computational cost
         rvmin = rv_simbad - 1; rvmax = rv_simbad + 1
     except:
-        rvmin = -200; rvmax = 200
+        rvmin = -150; rvmax = 150
 
     #get the cross-correlation
-    skipedge_values = [500, 1000, 5000, 20000, 50000, 80000]
+    skipedge_values = [0, 100, 500, 1000, 5000, 20000, 50000]
 
     for skipedge in skipedge_values:
         try:
-            rv, cc = pyasl.crosscorrRV(w=w, f=f, tw=tw,
+            rv, cc = pyasl.crosscorrRV(w=w_cut, f=f_cut, tw=tw,
                                     tf=tf, rvmin=rvmin, rvmax=rvmax, drv=drv, skipedge=skipedge)
             break  # Break out of the loop if successful
         except Exception as e:
-            print(f"Error with skipedge={skipedge}: {e}")
+            #print(f"Error with skipedge={skipedge}: {e}")
+            #print(f"Error with skipedge={skipedge}")
+            continue
             # Continue to the next iteration
 
     #index of the maximum cross-correlation function
@@ -388,7 +351,7 @@ def get_gaiadr3(name):
 
 ########################
 
-def choose_snr(snr_arr, min_snr = 30, max_snr = 550):
+def choose_snr(snr_arr, min_snr = 15, max_snr = 550):
   """Function to select the individual spectra given their respective minimum SNR"""
   #print("Min snr:", min_snr)
   #print("Max snr:", max_snr)
@@ -397,21 +360,6 @@ def choose_snr(snr_arr, min_snr = 30, max_snr = 550):
     print("Not enough SNR")
     return ([],)
   return index_cut
-
-########################
-
-def untar_ancillary_harps(path_download):
-  """Function to uncompress and copy the s1d and ccd files from the harps ancillary data"""
-  files_tar = glob.glob(path_download+"*.tar")
-
-  for f in files_tar:
-    file = tarfile.open(f)
-    file.extractall(path=path_download)
-  if not os.path.isdir(path_download+"S1D_CCF"):
-    os.mkdir(path_download+"S1D_CCF")
-
-  os.system("mv "+path_download+"data/*/*/*s1d_A*.fits "+path_download+"S1D_CCF/")
-  os.system("mv "+path_download+"data/*/*/*ccf*_A*.fits "+path_download+"S1D_CCF/")
 
 ########################
 
@@ -445,6 +393,10 @@ def plot_line(data, line, lstyle = "-"):
     for array in data:
         wv = array[0]; flux = array[1]
         wv_array = np.where((line_wv-window < wv) & (wv < line_wv+window))
+
+        if wv_array[0].shape == (0,):
+            continue
+
         wv = wv[wv_array]
         flux = flux[wv_array]
         #flux_normalized = flux/np.linalg.norm(flux)
@@ -537,6 +489,7 @@ def line_ratio_indice(data, line="CaI"):
         wv_array = np.where((line_wv-window < wv) & (wv < line_wv+window))
         wv = wv[wv_array]
         flux = flux[wv_array]
+        #print(flux.shape)
         #flux_normalized = flux/np.linalg.norm(flux)
         flux_normalized = (flux-np.min(flux))/(np.max(flux)-np.min(flux))
 
@@ -566,7 +519,7 @@ def flag_ratio_RV_corr(files,instr):
     '''
     offset_list = np.linspace(-1,1,1001)
     flag_list = np.zeros((len(files)))
-
+    #print(files)
     for i,file in enumerate(files):
         wv, flux, hdr = read_fits(file,instrument=instr,mode="rv_corrected")
         #if i == 0: wv += 0.2 #just to fake a bad spectrum
@@ -588,26 +541,6 @@ def flag_ratio_RV_corr(files,instr):
 
     return flag_ratio, flag_list
 
-#################################
-
-def negative_flux_treatment(f, method):
-    '''
-    This function is no longer used, since the negative flux is only a problem if it is in the lines
-    where the activity indices are computed. 
-    Nonetheless, one can choose wether so skip the spectrum entirely or to replace the negative values by zero.
-    Also not sure if this works correctly because it is no longer needed.
-    '''
-    if method == "skip":
-        # skips the spectra that have negative fluxes           
-        neg_flux_position = np.where(f < 0)[0]
-        if neg_flux_position.shape[0] != 0:
-            return neg_flux_position
-        
-    elif method == "zero_pad":
-        #replace negative flux by zero flux
-        f = np.where(f < 0, 1e-5, f)
-        return f
-    
 #################################
     
 def general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_ratio):
