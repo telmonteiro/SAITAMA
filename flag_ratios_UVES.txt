@@ -298,3 +298,140 @@ Bad spectrum: teste_download/HD47536/HD47536_UVES/ADP/ADP.2020-07-17T11:47:12.35
 Bad spectrum: teste_download/HD47536/HD47536_UVES/ADP/ADP.2020-07-17T11:47:12.082.fits
 Bad spectrum: teste_download/HD47536/HD47536_UVES/ADP/ADP.2020-07-17T11:47:11.979.fits
 Bad spectrum: teste_download/HD47536/HD47536_UVES/ADP/ADP.2020-07-17T11:47:11.975.fits
+##########################
+Star: HD209100
+Flag ratio: 1.0
+##########################
+Star: HD160691
+Flag ratio: 1.0
+##########################
+Star: HD115617
+Flag ratio: 0.8
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.704.fits
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.270.fits
+##########################
+Star: HD115617
+Flag ratio: 0.8
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.704.fits
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.270.fits
+##########################
+Star: HD115617
+Flag ratio: 0.8
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.704.fits
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.270.fits
+##########################
+Star: HD115617
+Flag ratio: 0.6
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.704.fits
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.646.fits
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.270.fits
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.738.fits
+##########################
+Star: HD115617
+Flag ratio: 0.6
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.704.fits
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.646.fits
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.270.fits
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.738.fits
+##########################
+Star: HD115617
+Flag ratio: 0.6
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.704.fits
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.646.fits
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.270.fits
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.738.fits
+##########################
+Star: HD115617
+Flag ratio: 0.8
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.704.fits
+Bad spectrum: teste_download/HD115617/HD115617_UVES/ADP/ADP.2020-07-11T00:56:38.270.fits
+##########################
+Star: HD22049
+Flag ratio: 0.9090909090909091
+Bad spectrum: teste_download/HD22049/HD22049_UVES/ADP/ADP.2020-08-10T12:13:46.749.fits
+Bad spectrum: teste_download/HD22049/HD22049_UVES/ADP/ADP.2020-08-10T12:13:46.769.fits
+Bad spectrum: teste_download/HD22049/HD22049_UVES/ADP/ADP.2020-08-10T12:13:46.706.fits
+Bad spectrum: teste_download/HD22049/HD22049_UVES/ADP/ADP.2020-08-10T12:13:46.861.fits
+##########################
+Star: HD102365
+Flag ratio: 0.88
+Bad spectrum: teste_download/HD102365/HD102365_UVES/ADP/ADP.2020-06-19T07:03:20.660.fits
+Bad spectrum: teste_download/HD102365/HD102365_UVES/ADP/ADP.2020-06-19T06:48:38.781.fits
+Bad spectrum: teste_download/HD102365/HD102365_UVES/ADP/ADP.2020-06-09T15:05:32.139.fits
+##########################
+Star: HD1461
+Flag ratio: 1.0
+##########################
+Star: HD16417
+Flag ratio: 0.8333333333333334
+Bad spectrum: teste_download/HD16417/HD16417_UVES/ADP/ADP.2020-06-19T16:02:57.549.fits
+##########################
+Star: HD10647
+Flag ratio: 0.75
+Bad spectrum: teste_download/HD10647/HD10647_UVES/ADP/ADP.2020-06-19T09:41:59.265.fits
+##########################
+Star: HD13445
+Flag ratio: 0.7692307692307693
+Bad spectrum: teste_download/HD13445/HD13445_UVES/ADP/ADP.2020-07-21T08:21:25.271.fits
+Bad spectrum: teste_download/HD13445/HD13445_UVES/ADP/ADP.2020-07-21T08:21:25.429.fits
+Bad spectrum: teste_download/HD13445/HD13445_UVES/ADP/ADP.2020-07-21T08:21:25.107.fits
+##########################
+Star: HD142A
+Flag ratio: 0.5
+Bad spectrum: teste_download/HD142A/HD142A_UVES/ADP/ADP.2020-08-10T13:35:17.032.fits
+Bad spectrum: teste_download/HD142A/HD142A_UVES/ADP/ADP.2020-07-17T11:47:11.802.fits
+Bad spectrum: teste_download/HD142A/HD142A_UVES/ADP/ADP.2021-08-31T15:39:20.214.fits
+Bad spectrum: teste_download/HD142A/HD142A_UVES/ADP/ADP.2020-07-17T11:47:11.858.fits
+Bad spectrum: teste_download/HD142A/HD142A_UVES/ADP/ADP.2020-06-19T09:41:59.103.fits
+Bad spectrum: teste_download/HD142A/HD142A_UVES/ADP/ADP.2020-08-10T13:35:16.928.fits
+##########################
+Star: HD108147
+Flag ratio: 0.25
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2020-09-01T16:34:47.763.fits
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2020-08-10T15:55:11.788.fits
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2020-08-10T15:55:11.728.fits
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2020-06-19T06:55:24.336.fits
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2020-06-09T13:40:41.984.fits
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2020-08-10T16:06:19.100.fits
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2020-08-10T16:17:28.944.fits
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2021-08-28T15:19:23.103.fits
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2021-08-28T13:37:22.442.fits
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2020-06-10T07:33:10.236.fits
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2020-08-10T16:12:06.049.fits
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2020-09-01T16:09:42.547.fits
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2020-08-10T15:41:28.463.fits
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2020-09-01T16:09:42.836.fits
+Bad spectrum: teste_download/HD108147/HD108147_UVES/ADP/ADP.2020-08-10T16:17:29.073.fits
+##########################
+Star: HD16141
+Flag ratio: 0.6666666666666666
+Bad spectrum: teste_download/HD16141/HD16141_UVES/ADP/ADP.2020-07-17T12:15:19.106.fits
+Bad spectrum: teste_download/HD16141/HD16141_UVES/ADP/ADP.2020-07-17T12:15:19.085.fits
+Bad spectrum: teste_download/HD16141/HD16141_UVES/ADP/ADP.2020-07-17T12:16:34.400.fits
+Bad spectrum: teste_download/HD16141/HD16141_UVES/ADP/ADP.2020-07-17T12:17:37.464.fits
+##########################
+Star: HD179949
+Flag ratio: 0.75
+Bad spectrum: teste_download/HD179949/HD179949_UVES/ADP/ADP.2020-06-15T05:30:32.853.fits
+Bad spectrum: teste_download/HD179949/HD179949_UVES/ADP/ADP.2020-06-10T07:47:47.068.fits
+Bad spectrum: teste_download/HD179949/HD179949_UVES/ADP/ADP.2020-06-22T08:15:14.739.fits
+Bad spectrum: teste_download/HD179949/HD179949_UVES/ADP/ADP.2020-06-22T08:32:58.151.fits
+Bad spectrum: teste_download/HD179949/HD179949_UVES/ADP/ADP.2020-06-22T08:15:14.487.fits
+Bad spectrum: teste_download/HD179949/HD179949_UVES/ADP/ADP.2020-06-22T08:15:15.416.fits
+Bad spectrum: teste_download/HD179949/HD179949_UVES/ADP/ADP.2020-06-22T08:15:15.428.fits
+Bad spectrum: teste_download/HD179949/HD179949_UVES/ADP/ADP.2020-06-22T08:32:57.813.fits
+Bad spectrum: teste_download/HD179949/HD179949_UVES/ADP/ADP.2020-06-22T08:15:14.517.fits
+Bad spectrum: teste_download/HD179949/HD179949_UVES/ADP/ADP.2020-06-22T08:15:14.735.fits
+Bad spectrum: teste_download/HD179949/HD179949_UVES/ADP/ADP.2020-06-22T08:15:14.751.fits
+##########################
+Star: HD47536
+Flag ratio: 1.0
+##########################
+Star: HD20794
+Flag ratio: 0.7
+Bad spectrum: teste_download/HD20794/HD20794_UVES/ADP/ADP.2020-06-09T17:00:01.514.fits
+Bad spectrum: teste_download/HD20794/HD20794_UVES/ADP/ADP.2020-06-09T17:00:01.681.fits
+Bad spectrum: teste_download/HD20794/HD20794_UVES/ADP/ADP.2020-06-09T17:00:02.059.fits
+##########################
+Star: HD192310
+Flag ratio: 1.0

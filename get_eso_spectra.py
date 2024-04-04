@@ -15,7 +15,7 @@ username_eso = "telmonteiro"
 eso.login(username_eso)
 eso.ROW_LIMIT = -1
 
-neglect_data = {}
+neglect_data = {"HD20794":"ADP.2020-08-10T15:36:05.310"}
 
 def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS", min_snr=10, max_snr=550, box= 0.07, path_download_base="tmpdir_download4/", max_spectra=250):
     """
@@ -90,13 +90,12 @@ def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS"
 
     return paths_download
 
-#stars = ["HD192310"] #["HD20794","HD85512","HD192310"]
+stars = ["HD20794","HD85512","HD192310"]
 
 #stars = ['HD209100', 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461', 
 #         'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536']
-stars = ['HD179949', 'HD47536']
 
-instruments = ["UVES"] # ["HARPS","ESPRESSO","FEROS","UVES"] #UVES has to be configured. the problem is with BJD
+instruments = ["UVES"] # ["HARPS","ESPRESSO","FEROS","UVES"]  the problem is with BJD in UVES
 columns = ['I_CaII', 'I_CaII_err', 'I_CaII_Rneg', 'I_Ha06', 'I_Ha06_err', 'I_Ha06_Rneg', 'I_NaI', 'I_NaI_err', 'I_NaI_Rneg',
            'bjd', 'file', 'instr', 'rv', 'obj', 'SNR'] #for df
 indices= ['I_CaII', 'I_Ha06', 'I_NaI'] #indices for activity
@@ -232,6 +231,7 @@ def main():
                 plt.clf()  
 
             if flag_ratio > 0:
+                #print(df)
                 cols = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv']
                 df = sigma_clip(df, cols, sigma=3)
 

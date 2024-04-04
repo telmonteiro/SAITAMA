@@ -158,7 +158,7 @@ def sigma_clip(df, cols, sigma):
     Rough sigma clipping of a data frame.
     '''
     for col in cols:
-        if math.isnan(df[col][0]) == False:
+        if math.isnan(list(df[col])[0]) == False:
             mean= df[col].mean()
             std = df[col].std()
             df = df[(df[col] >= mean - sigma * std) & (df[col] <= mean + sigma * std)]
@@ -234,10 +234,28 @@ def read_fits(file_name,instrument,mode):
             flux = hdul[0].data[1]
             header = hdul[0].header
     
+    elif instrument == "ESPRESSO":
+        if mode == "raw":
+            if "s1d_A" in file_name:
+                flux = hdul[0].data
+                header = hdul[0].header
+                wv = calc_fits_wv_1d(header)
+            elif "ADP" in file_name:
+                header = hdul[0].header
+                wv = hdul[1].data[0][0]
+                flux = hdul[1].data[0][1]
+                bjd = hdul[0].header["MJD-OBS"]+2400000.5
+                header["HIERARCH ESO DRS BJD"] = bjd
+        elif mode == "rv_corrected":
+            wv = hdul[0].data[0]
+            flux = hdul[0].data[1]
+            header = hdul[0].header
+
     else:
         flux = hdul[0].data
         header = hdul[0].header
         wv = calc_fits_wv_1d(header)
+
     hdul.close()
 
     return wv, flux, header
@@ -265,7 +283,12 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
 
     try:
         rv_simbad = _get_simbad_data(star=star, alerts=False)["RV_VALUE"] #just to minimize the computational cost
-        rvmin = rv_simbad - 1; rvmax = rv_simbad + 1
+        if instrument == "HARPS":
+            rvmin = rv_simbad - 2; rvmax = rv_simbad + 2
+        elif instrument == "UVES":
+            rvmin = rv_simbad - 50; rvmax = rv_simbad + 50
+        elif instrument == "ESPRESSO":
+            rvmin = rv_simbad - 100; rvmax = rv_simbad + 100
     except:
         rvmin = -150; rvmax = 150
 
@@ -486,10 +509,11 @@ def line_ratio_indice(data, line="CaI"):
 
     for i in range(len(data)):
         wv = data[i][0]; flux = data[i][1]
+        #print(wv[np.where((6500 < wv) & (wv < 6580))])
         wv_array = np.where((line_wv-window < wv) & (wv < line_wv+window))
         wv = wv[wv_array]
+        #print(wv_array)
         flux = flux[wv_array]
-        #print(flux.shape)
         #flux_normalized = flux/np.linalg.norm(flux)
         flux_normalized = (flux-np.min(flux))/(np.max(flux)-np.min(flux))
 
