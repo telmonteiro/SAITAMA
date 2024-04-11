@@ -3,6 +3,14 @@ from astropy.io import fits
 from util_funcs import read_bintable
 from PyAstronomy.pyTiming import pyPeriod
 
+def are_harmonics(period1, period2, tolerance=0.1):
+    ratio = period1 / period2
+    # Check if the ratio is close to an integer or simple fraction
+    if abs(ratio - round(ratio)) < tolerance:
+        return True
+    else:
+        return False
+
 def gls_periodogram(star, I_CaII, I_CaII_err, bjd, print_info, mode, save, path_save):
     # Compute the GLS periodogram with default options. Choose Zechmeister-Kuerster normalization explicitly
     clp = pyPeriod.Gls((bjd - 2450000, I_CaII, I_CaII_err), norm="ZK", verbose=print_info,ofac=30)
@@ -22,10 +30,21 @@ def gls_periodogram(star, I_CaII, I_CaII_err, bjd, print_info, mode, save, path_
     if mode == "Period":
         plt.xlabel("Period [days]")
         x_axis = 1/clp.freq
+
+        array_descending = np.argsort(clp.power)[-3:]
+        top_3_period = x_axis[array_descending]
+        #print(top_3_period)
+        for i in range(len(top_3_period)):
+            for j in range(i+1, len(top_3_period)):
+                if are_harmonics(top_3_period[j], top_3_period[i], tolerance=0.1):
+                    print(f"Period {top_3_period[i]} and {top_3_period[j]} are harmonics of each other")
+
         plt.xlim([0, period+2000])
+
     elif mode == "Frequency":
         plt.xlabel("Frequency [1/days]")
         x_axis = clp.freq
+
     plt.ylabel("Power")
     plt.title(f"Power vs {mode} for GLS Periodogram")
     plt.plot(x_axis, clp.power, 'b-')
@@ -49,7 +68,7 @@ def gls_periodogram(star, I_CaII, I_CaII_err, bjd, print_info, mode, save, path_
 
     return round(period,3), round(period_err,3)
 
-target_save_name = "HD46375"
+target_save_name = "HD22049"
 instr = "HARPS"
 folder_path = f"teste_download_rv_corr/{target_save_name}/{target_save_name}_{instr}/"
 file_path = folder_path+f"df_stats_{target_save_name}.fits"
@@ -58,7 +77,7 @@ df, hdr = read_bintable(file_path,print_info=False)
 
 t_span = max(df["bjd"])-min(df["bjd"])
 n_spec = len(df)
-if n_spec >= 20 and t_span >= 365:  #only compute periodogram if star has at least 20 spectra in a time span of at least 1 years
+if n_spec >= 30 and t_span >= 365:  #only compute periodogram if star has at least 20 spectra in a time span of at least 1 years
 
     period, period_err = gls_periodogram(target_save_name, df["I_CaII"],df["I_CaII_err"],df["bjd"], print_info = False,
                                          mode = "Period",
