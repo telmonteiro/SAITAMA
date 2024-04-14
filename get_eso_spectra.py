@@ -90,12 +90,13 @@ def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS"
 
     return paths_download
 
-stars = ["HD20794","HD85512","HD192310"]
+#stars = ["HD20794","HD85512","HD192310"]
 
-#stars = ['HD209100', 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461', 
-#         'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536']
+stars = ['HD209100', 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461', 
+        'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536',
+        'HD20794',"HD85512","HD192310"]
 
-instruments = ["UVES"] # ["HARPS","ESPRESSO","FEROS","UVES"]  the problem is with BJD in UVES
+instruments = ["HARPS","ESPRESSO","UVES"] # the problem is with BJD in UVES
 columns = ['I_CaII', 'I_CaII_err', 'I_CaII_Rneg', 'I_Ha06', 'I_Ha06_err', 'I_Ha06_Rneg', 'I_NaI', 'I_NaI_err', 'I_NaI_Rneg',
            'bjd', 'file', 'instr', 'rv', 'obj', 'SNR'] #for df
 indices= ['I_CaII', 'I_Ha06', 'I_NaI'] #indices for activity
@@ -158,7 +159,7 @@ def main():
             if len(files) == 0:
                 continue
             files_tqdm = tqdm.tqdm(files)
-            sun_template_wv, sun_template_flux, sun_header = read_fits(file_name="Sun1000.fits",instrument=None, mode=None) #template spectrum for RV correction
+            sun_template_wv, sun_template_flux, sun_template_flux_err, sun_header = read_fits(file_name="Sun1000.fits",instrument=None, mode=None) #template spectrum for RV correction
             
             #creates folders to save the rv corrected fits files
             folder_path = f"teste_download_rv_corr/{target_save_name}/{target_save_name}_{instr}/"
@@ -172,7 +173,7 @@ def main():
             for i,file in enumerate(files_tqdm):
                 time.sleep(0.01)
 
-                wv, f, hdr = read_fits(file,instr,mode="raw")
+                wv, f, f_err, hdr = read_fits(file,instr,mode="raw")
 
                 #value = negative_flux_treatment(f, method="skip") #method can be "zero_pad"
 
@@ -182,7 +183,7 @@ def main():
                 
                 wv_corr, mean_delta_wv = correct_spec_rv(w, radial_velocity, units = "m/s")
 
-                data = np.vstack((wv_corr, f))
+                data = np.vstack((wv_corr, f, f_err))
                 hdu = fits.PrimaryHDU(data, header=hdr)
                 hdul = fits.HDUList([hdu])
                 file_path = file.replace('teste_download', 'teste_download_rv_corr')
@@ -192,7 +193,10 @@ def main():
                 data_array.append(data)
 
                 #run ACTIN2
-                spectrum = dict(wave=wv_corr, flux=f)
+                if f_err[0] != 0:
+                    spectrum = dict(wave=wv_corr, flux=f, flux_err = f_err)
+                else: 
+                    spectrum = dict(wave=wv_corr, flux=f)
                 SNR = hdr["SNR"]
                 #flag for goodness of RV correction  
                 flag_ratio, flag_list = flag_ratio_RV_corr([file_path],instr)
@@ -209,17 +213,16 @@ def main():
             flag_col = np.array(df["RV_flag"])
             good_spec_ind = np.where((flag_col == 0))
             N_good_spec = len(flag_col[good_spec_ind])
-            flag_ratio = N_good_spec / len(flag_col)  
+            flag_rv_ratio = N_good_spec / len(flag_col)  
             bad_spec_indices = np.where(flag_col == 1)[0]
             df = df.drop(labels=list(bad_spec_indices))
             #print(df)
             #print(len(df["RV_flag"]))
-            # Write to a text file
-            with open(f"flag_ratios_{instr}.txt", "a") as f:
+            with open(f"flag_ratios_{instr}.txt", "a") as f: # Write to a text file
                 f.write("##########################\n")
                 f.write(f"Star: {target_save_name}\n")
-                f.write(f"Flag ratio: {flag_ratio}\n")
-                if flag_ratio != 1:
+                f.write(f"Flag ratio: {flag_rv_ratio}\n")
+                if flag_rv_ratio != 1:
                     for index in bad_spec_indices:
                         f.write(f"Bad spectrum: {files[index]}\n")
 
@@ -227,17 +230,17 @@ def main():
             for line in ["Ha","CaIIH","CaIIK","FeII","NaID1","NaID2","HeI","CaI"]:
                 plt.figure(2)
                 plot_line(data=data_array, line=line)
-                plt.savefig(folder_path+f"{target_save_name}_{instr}_{line}.png", bbox_inches="tight")
+                plt.savefig(folder_path+f"{target_save_name}_{instr}_{line}.pdf", bbox_inches="tight")
                 plt.clf()  
 
-            if flag_ratio > 0:
+            if flag_rv_ratio > 0:
                 #print(df)
                 cols = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv']
                 df = sigma_clip(df, cols, sigma=3)
 
                 plt.figure(3)
                 plot_RV_indices(target_save_name, df, indices, save=True, 
-                path_save = folder_path+f"{target_save_name}_{instr}.png")
+                path_save = folder_path+f"{target_save_name}_{instr}.pdf")
                 #plt.show()
 
                 ind_I_CaII_Rneg = df[df["I_CaII_Rneg"] < 0.01].index
@@ -250,19 +253,20 @@ def main():
                 except:
                     n_spec = 0
                 if n_spec >= 30 and t_span >= 2*365:  #only compute periodogram if star has at least 30 spectra in a time span of at least 2 years
-                    period, period_err = gls_periodogram(target_save_name, I_CaII_extracted, I_CaII_err_extracted, bjd_extracted, 
+                    period, period_err, flag_period = gls_periodogram(target_save_name, I_CaII_extracted, I_CaII_err_extracted, bjd_extracted, 
                                                         print_info = False, mode = "Period",
-                                            save=True, path_save=folder_path+f"{target_save_name}_GLS.png")
+                                            save=True, path_save=folder_path+f"{target_save_name}_GLS.pdf")
                     plt.clf()
                     print(f"Period of I_CaII: {period} +/- {period_err} days")
-                else: period = 0; period_err = 0 
+                    print(f"Flag of periodogram: {flag_period}")
+                else: period = 0; period_err = 0; flag_period = "white"
 
                 stats_df = stats_indice(target_save_name,cols,df)
                 print(stats_df)
                 stats_df.to_csv(folder_path+f"stats_{target_save_name}.csv")          
 
                 file_path = folder_path+f"df_stats_{target_save_name}.fits"
-                general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_ratio)
+                general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_period, flag_rv_ratio)
                 
                 #shutil.rmtree(f"teste_download/{target_save_name}/")  #remove original fits files
 

@@ -209,29 +209,35 @@ def read_fits(file_name,instrument,mode):
                 flux = hdul[0].data
                 header = hdul[0].header
                 wv = calc_fits_wv_1d(header)
+                flux_err = np.zeros_like(flux)
             elif "ADP" in file_name:
                 wv = hdul[1].data[0][0]
                 flux = hdul[1].data[0][1]
                 bjd = hdul[0].header["HIERARCH ESO DRS BJD"]
                 header = hdul[0].header
                 header["HIERARCH ESO DRS BJD"] = bjd
+                if math.isnan(hdul[1].data["ERR"][0][0]):
+                    flux_err = np.zeros_like(flux)
+                else: 
+                    flux_err = hdul[1].data["ERR"][0]
         elif mode == "rv_corrected":
-            #print(hdul)
-            #print(hdul.info())
             wv = hdul[0].data[0]
             flux = hdul[0].data[1]
+            flux_err = hdul[0].data[2]
             header = hdul[0].header
 
     elif instrument == "UVES":
         if mode == "raw":
             header = hdul[0].header
-            wv = hdul[1].data[0][0]
-            flux = hdul[1].data[0][1]
+            wv = hdul[1].data["WAVE"][0]
+            flux = hdul[1].data["FLUX"][0]
             bjd = hdul[0].header["MJD-OBS"]+2400000.5
             header["HIERARCH ESO DRS BJD"] = bjd
+            flux_err = hdul[1].data["ERR"][0]
         elif mode == "rv_corrected":
             wv = hdul[0].data[0]
             flux = hdul[0].data[1]
+            flux_err = hdul[0].data[2]
             header = hdul[0].header
     
     elif instrument == "ESPRESSO":
@@ -240,25 +246,30 @@ def read_fits(file_name,instrument,mode):
                 flux = hdul[0].data
                 header = hdul[0].header
                 wv = calc_fits_wv_1d(header)
+                flux_err = np.zeros_like(flux)
             elif "ADP" in file_name:
+                print(hdul[0].data)
                 header = hdul[0].header
-                wv = hdul[1].data[0][0]
-                flux = hdul[1].data[0][1]
+                wv = hdul[1].data["WAVE_AIR"][0]
+                flux = hdul[1].data["FLUX_EL"][0]
+                flux_err = hdul[1].data["ERR_EL"][0]
                 bjd = hdul[0].header["MJD-OBS"]+2400000.5
                 header["HIERARCH ESO DRS BJD"] = bjd
         elif mode == "rv_corrected":
             wv = hdul[0].data[0]
             flux = hdul[0].data[1]
+            flux_err = hdul[0].data[2]
             header = hdul[0].header
 
     else:
         flux = hdul[0].data
         header = hdul[0].header
         wv = calc_fits_wv_1d(header)
+        flux_err = np.zeros_like(flux)
 
     hdul.close()
 
-    return wv, flux, header
+    return wv, flux, flux_err, header
 
 ########################
 def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, template_spec, drv, units, instrument):
@@ -288,7 +299,7 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
         elif instrument == "UVES":
             rvmin = rv_simbad - 50; rvmax = rv_simbad + 50
         elif instrument == "ESPRESSO":
-            rvmin = rv_simbad - 100; rvmax = rv_simbad + 100
+            rvmin = rv_simbad - 2; rvmax = rv_simbad + 2
     except:
         rvmin = -150; rvmax = 150
 
@@ -567,7 +578,7 @@ def flag_ratio_RV_corr(files,instr):
 
 #################################
     
-def general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_ratio):
+def general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_period, flag_rv_ratio):
     '''
     Takes the data array that consists in a 3D cube containing the wavelength and flux for each spectrum used and
     the data frame with the statistics.
@@ -585,7 +596,8 @@ def general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, 
                 "SNR_MAX":[max_snr,"Maximum SNR"],
                 "PERIOD_I_CaII":[period,"Period of CaII activity index"],
                 "PERIOD_I_CaII_ERR":[period_err,"Error of period of CaII activity index"],
-                "FLAG_RV":[flag_ratio,"Goodness of RV correction indicador. 1 = all good"],
+                "FLAG_PERIOD":[flag_period,"Goodness of periodogram fit flag. Color based."],
+                "FLAG_RV":[flag_rv_ratio,"Goodness of RV correction indicador. 1 = all good"],
                 "COMMENT":["Spectra based on SNR - time span trade-off","Comment"],
                 "COMMENT1":["RV obtained from CCF measure (m/s)","Comment"],
                 "COMMENT2":["3D data of wv (Angs) and flux of each spectrum","Comment"]}
@@ -611,7 +623,40 @@ def general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, 
     hdul.writeto(file_path, overwrite=True)
 
 #################################
-    
+
+def are_harmonics(period1, period2, tolerance=0.1):
+    ratio = period1 / period2
+    # Check if the ratio is close to an integer or simple fraction
+    if abs(ratio - round(ratio)) < tolerance:
+        return True
+    else:
+        return False
+
+def periodogram_flagging(harmonics_list, period, period_err, power_list, plevels):
+    '''
+    Green/4: error < 10% and no harmonics in 3 periods with most power
+    Yellow/3: 10% < error < 20% and no harmonics in 3 periods with most power
+    Orange/2: harmonics in 3 periods with most power or no error
+    Red/1: many periods with power close to each under: if number of periods over 80% of the max > 3
+    Black/0: discarded, error > 20%, period under 1 yr or over 100 yrs, below FAP 1% level
+    '''
+    error = period_err/period * 100
+    powers_close_max = [n for n in power_list if n > 0.8*np.max(power_list)]
+
+    if error > 20 or np.max(power_list) < plevels[-1] or period < 365 or period > 100*365:
+        flag = "black"
+    else:
+        if error <= 10 and len(harmonics_list) == 0:
+            flag = "green"
+        elif 10 < error <= 20 and len(harmonics_list) == 0:
+            flag = "yellow"
+        elif len(harmonics_list) > 0 or period_err == 0.0:
+            flag = "orange"
+        elif len(powers_close_max) > 3:
+            flag = "red"
+
+    return flag
+        
 def gls_periodogram(star, I_CaII, I_CaII_err, bjd, print_info, mode, save, path_save):
     # Compute the GLS periodogram with default options. Choose Zechmeister-Kuerster normalization explicitly
     clp = pyPeriod.Gls((bjd - 2450000, I_CaII, I_CaII_err), norm="ZK", verbose=print_info,ofac=30)
@@ -630,17 +675,34 @@ def gls_periodogram(star, I_CaII, I_CaII_err, bjd, print_info, mode, save, path_
     plt.subplot(1, 2, 1)
     if mode == "Period":
         plt.xlabel("Period [days]")
-        x_axis = 1/clp.freq
+        period_list = 1/clp.freq
+
+        array_descending = np.argsort(clp.power)[-3:]
+        top_3_period = period_list[array_descending]
+        harmonics_list = []
+        for i in range(len(top_3_period)):
+            for j in range(i+1, len(top_3_period)):
+                if are_harmonics(top_3_period[j], top_3_period[i], tolerance=0.01):
+                    #print(f"Period {top_3_period[i]} and {top_3_period[j]} are harmonics of each other")
+                    harmonics_list.append([top_3_period[i], top_3_period[j]])
+       
+        flag = periodogram_flagging(harmonics_list, period, period_err, clp.power, plevels)
+        print("Flag: ",flag)
+        
+        plt.plot(period_list, clp.power, 'b-')
         plt.xlim([0, period+2000])
+
     elif mode == "Frequency":
         plt.xlabel("Frequency [1/days]")
-        x_axis = clp.freq
+        freq_list = clp.freq
+        plt.plot(freq_list, clp.power, 'b-')
+
     plt.ylabel("Power")
     plt.title(f"Power vs {mode} for GLS Periodogram")
-    plt.plot(x_axis, clp.power, 'b-')
+    
     # Add the FAP levels to the plot
     for i in range(len(fapLevels)):
-        plt.plot([min(x_axis), max(x_axis)], [plevels[i]]*2, '--',
+        plt.plot([min(period_list), max(period_list)], [plevels[i]]*2, '--',
                 label="FAP = %4.1f%%" % (fapLevels[i]*100))
     plt.legend()
 
@@ -656,7 +718,7 @@ def gls_periodogram(star, I_CaII, I_CaII_err, bjd, print_info, mode, save, path_
     if save == True:
         plt.savefig(path_save, bbox_inches="tight")
 
-    return round(period,3), round(period_err,3)
+    return round(period,3), round(period_err,3), flag
 
 #################################
 
