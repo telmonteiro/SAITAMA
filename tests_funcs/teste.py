@@ -1,26 +1,31 @@
 from astropy.io import fits
-import matplotlib.pyplot as plt
-'''
-file_name = "ADP.2021-04-13T13:26:21.358.fits"
-star = "HD22049"
+import matplotlib.pyplot as plt, numpy as np, math
+
+#file_name = "ADP.2021-04-13T13:26:21.358.fits"
+#star = "HD22049"
+file_name = "teste_download/HD209100/HD209100_ESPRESSO/ADP/ADP.2022-10-11T10:20:06.404.fits"
+star="HD209100"
 instrument = "ESPRESSO"
 
 hdul = fits.open(file_name)
 #print(fits.info(file_name))
 print(repr(hdul[1].header))
 
-flux_cal = hdul[1].data["FLUX_CAL"][0]
+flux = hdul[1].data["FLUX"][0]
 wv = hdul[1].data["WAVE_AIR"][0]
-flux = hdul[1].data["FLUX_EL"][0]
+plt.plot(wv,flux)
+flux_el = hdul[1].data["FLUX_EL"][0]
 print(wv)
 print(flux)
-print(flux_cal)
-plt.plot(wv,flux)
-plt.plot(wv,flux_cal)
+valid_indices = ~np.isnan(flux_el)  # Get indices where flux is not NaN
+wv = wv[valid_indices]     # Select corresponding wv values
+flux_el = flux_el[valid_indices]
+print(flux_el)
+plt.plot(wv,flux_el)
 plt.show()
-'''
-#####################3
 
+#####################3
+'''
 file_name = "teste_download/HD16141/HD16141_UVES/ADP/ADP.2020-06-19T09:57:09.085.fits"
 star = "HD16141"
 instrument = "UVES"
@@ -43,3 +48,4 @@ print(flux_red_err)
 plt.plot(wv,flux)
 plt.plot(wv,flux_red)
 plt.show()
+'''

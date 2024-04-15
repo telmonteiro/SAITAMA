@@ -50,7 +50,7 @@ def flag_ratio_RV_corr(files,instr):
     flag_list = np.zeros((len(files)))
 
     for i,file in enumerate(files):
-        wv, flux, hdr = read_fits(file,instrument=instr,mode="rv_corrected")
+        wv, flux, flux_err, hdr = read_fits(file,instrument=instr,mode="rv_corrected")
         #if i == 0: wv += 0.2 #just to fake a bad spectrum
         ratio_list = np.zeros_like(offset_list)
         for j,offset in enumerate(offset_list):
@@ -60,7 +60,7 @@ def flag_ratio_RV_corr(files,instr):
         min_ratio_ind = np.argmin(ratio_list)
         offset_min = offset_list[min_ratio_ind]
         #print(offset_min)
-        if offset_min < -0.02 or offset_min > 0.02:
+        if offset_min < -0.05 or offset_min > 0.05:
             flag_list[i] = 1
         else: flag_list[i] = 0
 
@@ -71,8 +71,10 @@ def flag_ratio_RV_corr(files,instr):
     return flag_ratio, flag_list
 
 
-target_save_name = "HD108147" #a linha do CaI está um caos, mas as do CaII H&K e Halpha estao ok?
-instr = "HARPS"
+#target_save_name = "HD108147" #a linha do CaI está um caos, mas as do CaII H&K e Halpha estao ok?
+#instr = "HARPS"
+target_save_name="HD209100"
+instr="ESPRESSO"
 files = glob.glob(os.path.join(f"teste_download_rv_corr/{target_save_name}/{target_save_name}_{instr}/ADP", "ADP*.fits"))
 
 '''
@@ -88,7 +90,7 @@ plt.axhline(y=flux_continuum_arr,xmin=0,xmax=1,ls="--",ms=0.2)
 plt.title("Spectrum nr 21, highest ratio")
 '''
 #first spectrum
-wv, flux, hdr = read_fits(files[1],instrument=instr,mode="rv_corrected")
+wv, flux, flux_err, hdr = read_fits(files[4],instrument=instr,mode="rv_corrected")
 plt.figure(1)
 ratio_arr, center_flux_line_arr, flux_continuum_arr = line_ratio_indice([(wv,flux)], line="CaI")
 print("Ratio: ",ratio_arr[0])
@@ -115,10 +117,10 @@ for i,offset in enumerate(offset_list):
 plt.figure(3)
 plt.plot(offset_list,ratio_list)
 plt.axvline(x=0,ymin=0,ymax=1,ls="-",ms=0.1)
-plt.axvline(x=0.025,ymin=0,ymax=1,ls="--",ms=0.1)
-plt.axvline(x=-0.025,ymin=0,ymax=1,ls="--",ms=0.1)
+plt.axvline(x=0.05,ymin=0,ymax=1,ls="--",ms=0.1)
+plt.axvline(x=-0.05,ymin=0,ymax=1,ls="--",ms=0.1)
 plt.xlabel(r"Offset ($\lambda$)"); plt.ylabel("Ratio (Center of line / Continuum)")
-'''
+
 #plot offset vs I_CaII
 #wv -= 0.2
 from actin2.actin2 import ACTIN
@@ -136,7 +138,7 @@ for i,offset in enumerate(offset_list):
 plt.figure(4)
 plt.errorbar(offset_list,ICaII,yerr=ICaII_err)
 plt.xlabel(r"Offset ($\lambda$)"); plt.ylabel(r"$S_{CaII}$")
-'''
+
 
 #flag maker: for each spectrum, run an interval of offsets and if the minimum ratio is not in [-0.02,0.02], raises a flag
 plt.figure(5)

@@ -33,12 +33,15 @@ bjd = hdul[0].header["MJD-OBS"]+2400000.5
 hdr["HIERARCH ESO DRS BJD"] = bjd
 '''
 
-file_name = "teste_download/HD85512/HD85512_HARPS/ADP/ADP.2014-09-16T11:03:54.720.fits"
-instrument = "HARPS"
-star = "HD85512"
-wv, flux, flux_err, hdr = read_fits(file_name,instrument,mode="raw")
-#hdul = fits.open(file_name)
-#print(repr(hdul[1].header))
+#file_name = "teste_download/HD85512/HD85512_HARPS/ADP/ADP.2014-09-16T11:03:54.720.fits"
+#instrument = "HARPS"
+#star = "HD85512"
+#wv, flux, flux_err, hdr = read_fits(file_name,instrument,mode="raw")
+file_name = "teste_download/HD209100/HD209100_ESPRESSO/ADP/ADP.2021-04-13T13:43:01.656.fits"
+instrument= "ESPRESSO"
+star = "HD209100"
+hdul = fits.open(file_name)
+print(repr(hdul[1].header))
 #hdr = hdul[0].header
 #wv = hdul[1].data["WAVE"][0]
 #flux = hdul[1].data["FLUX"][0]

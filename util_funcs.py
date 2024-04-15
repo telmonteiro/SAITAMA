@@ -248,11 +248,23 @@ def read_fits(file_name,instrument,mode):
                 wv = calc_fits_wv_1d(header)
                 flux_err = np.zeros_like(flux)
             elif "ADP" in file_name:
-                print(hdul[0].data)
+                #print(hdul[0].data)
                 header = hdul[0].header
-                wv = hdul[1].data["WAVE_AIR"][0]
-                flux = hdul[1].data["FLUX_EL"][0]
-                flux_err = hdul[1].data["ERR_EL"][0]
+                try:
+                    wv = hdul[1].data["WAVE_AIR"][0]
+                except:
+                    wv = hdul[1].data["WAVE"][0]
+                try:
+                    flux = hdul[1].data["FLUX_EL"][0]
+                    flux_err = hdul[1].data["ERR_EL"][0]
+                    
+                    valid_indices = ~np.isnan(flux)  #perigo de haver valores NaN neste tipo de flux
+                    wv = wv[valid_indices]
+                    flux = flux[valid_indices]
+                    flux_err = flux_err[valid_indices]
+                except:
+                    flux = hdul[1].data["FLUX"][0]
+                    flux_err = hdul[1].data["ERR"][0]
                 bjd = hdul[0].header["MJD-OBS"]+2400000.5
                 header["HIERARCH ESO DRS BJD"] = bjd
         elif mode == "rv_corrected":
@@ -279,7 +291,7 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
     To maximize the search for RV and avoid errors, the script searches the RV in SIMBAD and makes a reasonable interval. 
     '''
     
-    if instrument == "HARPS" or instrument == "UVES":
+    if instrument == "HARPS" or instrument == "UVES" or instrument == "ESPRESSO":
         bjd = stellar_header["HIERARCH ESO DRS BJD"] #may change with instrument
     else: bjd = None
 
@@ -295,11 +307,11 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
     try:
         rv_simbad = _get_simbad_data(star=star, alerts=False)["RV_VALUE"] #just to minimize the computational cost
         if instrument == "HARPS":
-            rvmin = rv_simbad - 2; rvmax = rv_simbad + 2
+            rvmin = rv_simbad - 10; rvmax = rv_simbad + 10
         elif instrument == "UVES":
-            rvmin = rv_simbad - 50; rvmax = rv_simbad + 50
+            rvmin = rv_simbad - 100; rvmax = rv_simbad + 100
         elif instrument == "ESPRESSO":
-            rvmin = rv_simbad - 2; rvmax = rv_simbad + 2
+            rvmin = rv_simbad - 100; rvmax = rv_simbad + 100
     except:
         rvmin = -150; rvmax = 150
 
@@ -556,7 +568,7 @@ def flag_ratio_RV_corr(files,instr):
     flag_list = np.zeros((len(files)))
     #print(files)
     for i,file in enumerate(files):
-        wv, flux, hdr = read_fits(file,instrument=instr,mode="rv_corrected")
+        wv, flux, flux_err, hdr = read_fits(file,instrument=instr,mode="rv_corrected")
         #if i == 0: wv += 0.2 #just to fake a bad spectrum
         ratio_list = np.zeros_like(offset_list)
         for j,offset in enumerate(offset_list):
@@ -566,7 +578,7 @@ def flag_ratio_RV_corr(files,instr):
         min_ratio_ind = np.argmin(ratio_list)
         offset_min = offset_list[min_ratio_ind]
         #print(offset_min)
-        if offset_min < -0.03 or offset_min > 0.03:
+        if offset_min < -0.05 or offset_min > 0.05:
             flag_list[i] = 1
         else: flag_list[i] = 0
 
