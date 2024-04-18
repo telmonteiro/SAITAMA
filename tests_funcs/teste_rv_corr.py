@@ -52,7 +52,7 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
     
     return bjd, radial_velocity, cc[maxind], np.around(rv,0), cc, w, f
 
-stars = ['HD209100']#, 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461', 
+stars = ['HD46375']#, 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461', 
         # 'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536']
 
 instr = "ESPRESSO"
@@ -61,7 +61,7 @@ for target_save_name in stars:
     files = glob.glob(os.path.join(f"teste_download/{target_save_name}/{target_save_name}_{instr}/ADP", "ADP*.fits"))
     sun_template_wv, sun_template_flux, sun_template_flux_err, sun_header = read_fits(file_name="Sun1000.fits",instrument=None, mode=None) #template spectrum for RV correction
     drv = .1 #step to search rv
-    for i,file in enumerate([files[4]]):
+    for i,file in enumerate(files):
         print(file)
         wv, f, f_err, hdr = read_fits(file,instr,mode="raw")
 

@@ -1,6 +1,9 @@
 ##########################
 Star: HD209100
-Flag ratio: 1.0
+Flag ratio: 0.98
+Bad spectrum: teste_download/HD209100/HD209100_HARPS/ADP/ADP.2014-10-01T10:21:20.833.fits
+Bad spectrum: teste_download/HD209100/HD209100_HARPS/ADP/ADP.2014-10-01T10:21:15.923.fits
+Bad spectrum: teste_download/HD209100/HD209100_HARPS/ADP/ADP.2014-10-01T10:21:54.740.fits
 ##########################
 Star: HD160691
 Flag ratio: 0.96
@@ -21,10 +24,13 @@ Star: HD46375
 Flag ratio: 1.0
 ##########################
 Star: HD22049
-Flag ratio: 0.9733333333333334
+Flag ratio: 0.9533333333333334
 Bad spectrum: teste_download/HD22049/HD22049_HARPS/ADP/ADP.2014-10-02T09:59:48.740.fits
+Bad spectrum: teste_download/HD22049/HD22049_HARPS/ADP/ADP.2014-10-01T10:20:54.870.fits
 Bad spectrum: teste_download/HD22049/HD22049_HARPS/ADP/ADP.2014-10-02T10:01:33.883.fits
+Bad spectrum: teste_download/HD22049/HD22049_HARPS/ADP/ADP.2014-10-01T10:23:13.213.fits
 Bad spectrum: teste_download/HD22049/HD22049_HARPS/ADP/ADP.2014-10-01T10:20:42.893.fits
+Bad spectrum: teste_download/HD22049/HD22049_HARPS/ADP/ADP.2014-10-01T10:22:59.410.fits
 Bad spectrum: teste_download/HD22049/HD22049_HARPS/ADP/ADP.2014-10-01T10:20:02.420.fits
 ##########################
 Star: HD102365
@@ -50,76 +56,39 @@ Star: HD16417
 Flag ratio: 1.0
 ##########################
 Star: HD10647
-Flag ratio: 0.8333333333333334
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-09-25T15:36:20.137.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2020-01-18T01:12:28.509.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2020-01-18T01:12:28.511.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-10-01T10:20:47.197.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2020-01-18T01:12:28.513.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-10-01T10:20:36.680.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-10-01T10:22:46.973.fits
+Flag ratio: 0.96
+Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-10-01T10:22:43.780.fits
 Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2020-01-18T01:12:28.525.fits
 Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-09-29T13:27:08.773.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-10-01T10:21:18.540.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-10-01T10:19:54.883.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-09-16T11:06:07.383.fits
 Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-10-01T10:19:17.453.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2019-11-17T01:12:44.069.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2019-07-26T01:18:35.176.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-10-02T10:02:36.213.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-09-16T11:04:53.860.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-09-16T11:07:31.010.fits
 Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-10-01T10:22:39.330.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-09-16T11:05:45.790.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-10-02T10:00:24.783.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-09-16T11:06:45.810.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-09-17T11:22:34.160.fits
 Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2014-10-01T10:21:59.257.fits
-Bad spectrum: teste_download/HD10647/HD10647_HARPS/ADP/ADP.2019-11-10T01:17:16.293.fits
-##########################
-Star: HD13445
-Flag ratio: 0.9918032786885246
-Bad spectrum: teste_download/HD13445/HD13445_HARPS/ADP/ADP.2018-10-14T01:03:16.124.fits
 ##########################
 Star: HD142A
-Flag ratio: 0.4925373134328358
+Flag ratio: 0.7014925373134329
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:20:15.280.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:19:20.200.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-09-26T16:52:53.627.fits
-Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2018-12-16T01:14:06.487.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-09-26T16:53:07.460.fits
-Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:20:45.183.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:22:06.197.fits
-Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-09-26T16:54:45.350.fits
-Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2018-12-17T01:11:47.906.fits
-Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:21:15.723.fits
-Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:23:06.357.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:22:14.360.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:19:09.923.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2019-05-15T01:11:29.854.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:19:29.270.fits
-Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2018-12-20T01:17:11.714.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:20:05.507.fits
-Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:20:18.443.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:19:53.763.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:21:13.613.fits
-Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:21:28.433.fits
-Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:22:21.817.fits
-Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:19:22.597.fits
-Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:21:05.130.fits
-Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-09-26T16:52:37.753.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-09-26T16:54:19.710.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2019-05-15T01:11:29.856.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2018-10-23T01:28:49.150.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:23:05.417.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-09-26T16:54:49.460.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:22:34.990.fits
-Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:20:18.703.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-10-01T10:20:19.173.fits
 Bad spectrum: teste_download/HD142A/HD142A_HARPS/ADP/ADP.2014-09-26T16:54:24.277.fits
 ##########################
 Star: HD108147
-Flag ratio: 0.42857142857142855
+Flag ratio: 0.4805194805194805
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2014-10-01T10:19:15.710.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2014-10-01T10:23:22.680.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2019-03-27T14:48:30.442.fits
@@ -145,18 +114,14 @@ Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2018-04-18T01:04:03
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2018-01-28T01:03:26.925.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2019-07-05T01:14:25.624.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2018-02-23T01:01:45.537.fits
-Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2018-03-20T01:04:05.403.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2019-03-09T01:12:49.636.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2018-01-28T01:03:26.909.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2018-03-17T01:02:32.692.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2019-04-29T01:13:20.793.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2018-12-27T01:12:35.466.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2018-03-18T01:03:03.489.fits
-Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2017-11-29T01:03:49.815.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2018-04-18T01:04:03.054.fits
-Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2019-03-06T01:10:12.019.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2019-04-29T01:13:20.797.fits
-Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2017-11-29T01:03:49.855.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2016-06-22T01:04:47.000.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2019-03-27T14:48:30.444.fits
 Bad spectrum: teste_download/HD108147/HD108147_HARPS/ADP/ADP.2018-02-23T01:01:45.545.fits
@@ -169,9 +134,7 @@ Star: HD16141
 Flag ratio: 1.0
 ##########################
 Star: HD179949
-Flag ratio: 0.3333333333333333
-Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-10-02T10:00:41.887.fits
-Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-09-17T11:21:14.937.fits
+Flag ratio: 0.41025641025641024
 Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-10-02T10:00:29.173.fits
 Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-09-17T11:23:10.367.fits
 Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-10-02T10:00:51.127.fits
@@ -182,7 +145,6 @@ Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-09-17T11:23:49
 Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-09-17T11:19:58.337.fits
 Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-09-17T11:23:48.900.fits
 Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-09-17T11:23:37.830.fits
-Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-09-17T11:20:48.790.fits
 Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-09-17T11:22:06.977.fits
 Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-10-02T10:03:37.603.fits
 Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-09-17T11:21:49.303.fits
@@ -198,4 +160,13 @@ Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-10-02T10:03:45
 Bad spectrum: teste_download/HD179949/HD179949_HARPS/ADP/ADP.2014-09-17T11:22:27.173.fits
 ##########################
 Star: HD47536
+Flag ratio: 1.0
+##########################
+Star: HD20794
+Flag ratio: 1.0
+##########################
+Star: HD85512
+Flag ratio: 1.0
+##########################
+Star: HD192310
 Flag ratio: 1.0

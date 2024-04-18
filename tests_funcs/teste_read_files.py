@@ -12,8 +12,8 @@ actin = ACTIN()
 #file_name = "teste_download/HD20794/HD20794_UVES/ADP/ADP.2020-06-09T17:00:01.514.fits"
 #file_name = "ADP.2021-04-13T13:28:15.797.fits"
 
-#file_name = "ADP.2021-04-13T13:26:21.358.fits"
-#star = "HD22049"
+file_name = "ADP.2021-04-13T13:26:21.358.fits"
+star = "HD22049"
 #instrument = "ESPRESSO"
 
 #wv, flux, flux_err, hdr = read_fits(file_name,instrument,mode="raw")
@@ -37,16 +37,19 @@ hdr["HIERARCH ESO DRS BJD"] = bjd
 #instrument = "HARPS"
 #star = "HD85512"
 #wv, flux, flux_err, hdr = read_fits(file_name,instrument,mode="raw")
-file_name = "teste_download/HD209100/HD209100_ESPRESSO/ADP/ADP.2021-04-13T13:43:01.656.fits"
+
+#file_name = "teste_download/HD46375/HD46375_ESPRESSO/ADP/ADP.2021-04-15T08:27:41.684.fits"
+#star = "HD46375"
+#file_name = "teste_download/HD115617/HD115617_ESPRESSO/ADP/ADP.2021-04-15T09:55:22.502.fits"
+#star = "HD115617"
 instrument= "ESPRESSO"
-star = "HD209100"
 hdul = fits.open(file_name)
 print(repr(hdul[1].header))
-#hdr = hdul[0].header
-#wv = hdul[1].data["WAVE"][0]
-#flux = hdul[1].data["FLUX"][0]
-#flux_err = hdul[1].data["ERR"][0]
-#print(flux_err)
+hdr = hdul[0].header
+wv = hdul[1].data["WAVE"][0]
+flux = hdul[1].data["FLUX"][0]
+flux_err = hdul[1].data["ERR"][0]
+print(flux_err)
 plt.figure(6)
 plt.plot(wv,flux)
 
@@ -55,17 +58,19 @@ plt.plot(wv,flux)
 #plt.figure(2)
 #plot_line([(wv,flux)], line="Ha")
 
-sun_template_wv, sun_template_flux, sun_template_flux_err, sun_header = read_fits(file_name="Sun1000.fits",instrument=None, mode=None) #template spectrum for RV correction
-bjd, radial_velocity, cc_max, rv, cc, w, f = get_rv_ccf(star = star, stellar_wv = wv, stellar_flux = flux, stellar_header = hdr,
-                                                        template_hdr = sun_header, template_spec = sun_template_flux, 
-                                                        drv = .1, units = "m/s", instrument=instrument)
-print(radial_velocity)
+#sun_template_wv, sun_template_flux, sun_template_flux_err, sun_header = read_fits(file_name="Sun1000.fits",instrument=None, mode=None) #template spectrum for RV correction
+#bjd, radial_velocity, cc_max, rv, cc, w, f = get_rv_ccf(star = star, stellar_wv = wv, stellar_flux = flux, stellar_header = hdr,
+#                                                        template_hdr = sun_header, template_spec = sun_template_flux, 
+#                                                        drv = .1, units = "m/s", instrument=instrument)
+#print(radial_velocity)
 #
-plt.figure(5)
-plt.plot(rv,cc)
+#plt.figure(5)
+#plt.plot(rv,cc)
 
-wv_corr, mean_delta_wv = correct_spec_rv(w, radial_velocity, units = "m/s")
+wv_corr, mean_delta_wv = correct_spec_rv(wv, 16476, units = "m/s")
 
+plt.figure(2)
+plt.plot(wv_corr,flux_err)
 '''
 offset_list = np.linspace(-1,1,1001)
 flag_list = np.zeros((1))
@@ -93,9 +98,11 @@ plt.show()
 columns = ['I_CaII', 'I_CaII_err', 'I_CaII_Rneg', 'I_Ha06', 'I_Ha06_err', 'I_Ha06_Rneg', 'I_NaI', 'I_NaI_err', 'I_NaI_Rneg', 'file', 'instr'] 
 df = pd.DataFrame(columns=columns)
 if flux_err[0] != 0:
-    spectrum = dict(wave=wv_corr, flux=f, flux_err = flux_err)
+    spectrum = dict(wave=wv_corr, flux=flux, flux_err = flux_err)
 else: 
-    spectrum = dict(wave=wv_corr, flux=f)
+    spectrum = dict(wave=wv_corr, flux=flux)
+
+spectrum = dict(wave=wv_corr, flux=flux, flux_err = flux_err)
 
 indices= ['I_CaII', 'I_Ha06', 'I_NaI']
 headers = {"file":file_name,"instr":instrument}

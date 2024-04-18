@@ -230,10 +230,14 @@ def read_fits(file_name,instrument,mode):
         if mode == "raw":
             header = hdul[0].header
             wv = hdul[1].data["WAVE"][0]
-            flux = hdul[1].data["FLUX"][0]
+            try:
+                flux = hdul[1].data["FLUX"][0]
+                flux_err = hdul[1].data["ERR"][0]
+            except:
+                flux = hdul[1].data["FLUX_REDUCED"][0]
+                flux_err = hdul[1].data["ERR_REDUCED"][0]
             bjd = hdul[0].header["MJD-OBS"]+2400000.5
             header["HIERARCH ESO DRS BJD"] = bjd
-            flux_err = hdul[1].data["ERR"][0]
         elif mode == "rv_corrected":
             wv = hdul[0].data[0]
             flux = hdul[0].data[1]

@@ -3,9 +3,10 @@ import os, glob
 from util_funcs import read_bintable
 
 stars = ['HD209100', 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461', 
-         'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536']
+         'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536',
+         "HD20794","HD85512","HD192310"]
 
-keys = ['TIME_SPAN', 'N_SPECTRA', 'SNR_MIN', 'SNR_MAX', 'FLAG_RV', 'PERIOD_I_CaII', 'PERIOD_I_CaII_ERR', 
+keys = ['TIME_SPAN', 'N_SPECTRA', 'SNR_MIN', 'SNR_MAX', 'FLAG_RV', 'PERIOD_I_CaII', 'PERIOD_I_CaII_ERR', 'FLAG_PERIOD',
         'I_CAII_MAX', 'I_CAII_MIN', 'I_CAII_MEAN', 'I_CAII_MEDIAN', 'I_CAII_STD', "I_CAII_N_SPECTRA", 
         'I_HA06_MAX', 'I_HA06_MIN', 'I_HA06_MEAN', 'I_HA06_MEDIAN', 'I_HA06_STD', "I_HA06_N_SPECTRA",
         "RV_MEAN"] #'STAR_ID','INSTR', 'I_NAI_MAX', 'I_NAI_MIN', 'I_NAI_MEAN', 'I_NAI_MEDIAN', 'I_NAI_STD', 'RV_MAX', 'RV_MIN', 'RV_MEAN','RV_MEDIAN','RV_STD'
@@ -14,7 +15,7 @@ keys = ['TIME_SPAN', 'N_SPECTRA', 'SNR_MIN', 'SNR_MAX', 'FLAG_RV', 'PERIOD_I_CaI
 final_df = pd.DataFrame()
 
 for star in stars:
-    file = glob.glob(os.path.join(f"teste_download_rv_corr/{star}/{star}_UVES/", f"df_stats_{star}.fits"))
+    file = glob.glob(os.path.join(f"teste_download_rv_corr/{star}/{star}_ESPRESSO/", f"df_stats_{star}.fits"))
     if file == []: continue
     print(file)
     df, hdr = read_bintable(file[0], print_info=False)
@@ -22,7 +23,9 @@ for star in stars:
     values = {}
     for key, value in hdr.items():
         if key in keys:
-            values[key] = round(value,5)
+            if type(value) != str:
+                values[key] = round(value,5)
+            else: values[key] = value
 
     # Convert the dictionary to a DataFrame and transpose it
     star_df = pd.DataFrame(values, index=[star])
@@ -35,7 +38,7 @@ final_df.reset_index(inplace=True)
 final_df.rename(columns={"index": "STAR_ID"}, inplace=True)
 print(final_df)
 
-final_df.to_csv("df_15_stars_stats_UVES.csv")
+final_df.to_csv("df_15_stars_stats_ESPRESSO.csv")
 
 '''
 stars where GLS periodogram is not reliable: 

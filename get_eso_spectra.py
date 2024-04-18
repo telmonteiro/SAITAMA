@@ -94,9 +94,11 @@ def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS"
 
 stars = ['HD209100', 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461', 
         'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536',
-        'HD20794',"HD85512","HD192310"]
+        'HD20794',"HD85512","HD192310"] #parou em HD13445
 
-instruments = ["HARPS","ESPRESSO","UVES"] # the problem is with BJD in UVES
+stars = ["HD46375","HD115617"] 
+
+instruments = ["ESPRESSO"] # the problem is with BJD in UVES
 columns = ['I_CaII', 'I_CaII_err', 'I_CaII_Rneg', 'I_Ha06', 'I_Ha06_err', 'I_Ha06_Rneg', 'I_NaI', 'I_NaI_err', 'I_NaI_Rneg',
            'bjd', 'file', 'instr', 'rv', 'obj', 'SNR'] #for df
 indices= ['I_CaII', 'I_Ha06', 'I_NaI'] #indices for activity
@@ -133,6 +135,7 @@ def main():
             os.mkdir(star_folder_rv)
 
         for instr in instruments:
+
             print(f"Downloading and processing spectra from {instr} instrument")
             df = pd.DataFrame(columns=columns)
 
@@ -193,7 +196,7 @@ def main():
                 data_array.append(data)
 
                 #run ACTIN2
-                if f_err[0] != 0:
+                if f_err[10000] != 0:
                     spectrum = dict(wave=wv_corr, flux=f, flux_err = f_err)
                 else: 
                     spectrum = dict(wave=wv_corr, flux=f)
@@ -236,7 +239,8 @@ def main():
             if flag_rv_ratio > 0:
                 #print(df)
                 cols = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv']
-                df = sigma_clip(df, cols, sigma=3)
+                if len(df) > 5:  
+                    df = sigma_clip(df, cols, sigma=3)
 
                 plt.figure(3)
                 plot_RV_indices(target_save_name, df, indices, save=True, 
@@ -284,4 +288,6 @@ Problems with the program:
 
 - ESPRESSO and UVES spectrographs are not yet configured
 - some way of reducing running time, as well as supressing verbose of ESO download
+
+Note: some points have big errors in the indices, see the data frame ESPRESSO: HD115617, HD46375. solved by including the error in flux
 '''
