@@ -1,4 +1,4 @@
-import os, glob, logging, tarfile, numpy as np, matplotlib.pyplot as plt, pandas as pd, tqdm, time, shutil
+import os, glob, logging, numpy as np, matplotlib.pyplot as plt, pandas as pd, tqdm, time
 from astroquery.eso import Eso
 from astropy.io import fits
 from astroquery.simbad import Simbad
@@ -9,7 +9,6 @@ actin = ACTIN()
 
 # Setup logging logger
 global logger
-
 eso = Eso()
 username_eso = "telmonteiro"
 eso.login(username_eso)
@@ -35,7 +34,7 @@ def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS"
     if tbl_search is None:
         return "None"
     
-    if instrument == "UVES":
+    if instrument == "UVES": #to ensure that at least the Halpha line is included
         wav_lim_min = np.array([int(float(wav.split("..")[0]))*10 for wav in tbl_search["Wavelength"]])
         wav_lim_max = np.array([int(float(wav.split("..")[1]))*10 for wav in tbl_search["Wavelength"]])
         ind_wav_lim = np.where((wav_lim_min < 6400) & (wav_lim_max > 6600))
@@ -50,7 +49,7 @@ def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS"
 
     paths_download = []
 
-    #cuts the lowest SNR by a minimum
+    #cuts the lowest SNR by a minimum and a maximum
     icut = choose_snr(tbl_search['SNR'], min_snr = min_snr, max_snr = max_snr)
     if len(icut[0])<1:
         return "None"
@@ -90,15 +89,11 @@ def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS"
 
     return paths_download
 
-#stars = ["HD20794","HD85512","HD192310"]
-
 stars = ['HD209100', 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461', 
         'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536',
-        'HD20794',"HD85512","HD192310"] #parou em HD13445
+        'HD20794',"HD85512","HD192310"] 
 
-stars = ["HD46375","HD115617"] 
-
-instruments = ["ESPRESSO"] # the problem is with BJD in UVES
+instruments = ["UVES"]
 columns = ['I_CaII', 'I_CaII_err', 'I_CaII_Rneg', 'I_Ha06', 'I_Ha06_err', 'I_Ha06_Rneg', 'I_NaI', 'I_NaI_err', 'I_NaI_Rneg',
            'bjd', 'file', 'instr', 'rv', 'obj', 'SNR'] #for df
 indices= ['I_CaII', 'I_Ha06', 'I_NaI'] #indices for activity
@@ -108,7 +103,7 @@ max_snr_instr = {"HARPS":550,"ESPRESSO":1000,"FEROS":1000,"UVES":550} #max SNR t
 max_spectra = 150
 min_snr = 15
 
-download = True
+download = False
 
 ### Main program:
 def main():
@@ -170,14 +165,13 @@ def main():
                 os.mkdir(folder_path)
                 os.mkdir(folder_path+"ADP/")
 
-            data_array = [] #to plot the lines later, if too many spectra may cause memory problems
+            data_array = [] #to plot the lines later
             drv = .1 #step to search rv
 
-            for i,file in enumerate(files_tqdm):
+            for file in files_tqdm:
                 time.sleep(0.01)
 
                 wv, f, f_err, hdr = read_fits(file,instr,mode="raw")
-
                 #value = negative_flux_treatment(f, method="skip") #method can be "zero_pad"
 
                 bjd, radial_velocity, cc_max, rv, cc, w, f = get_rv_ccf(star = target_save_name, stellar_wv = wv, stellar_flux = f, stellar_header = hdr,
@@ -219,9 +213,8 @@ def main():
             flag_rv_ratio = N_good_spec / len(flag_col)  
             bad_spec_indices = np.where(flag_col == 1)[0]
             df = df.drop(labels=list(bad_spec_indices))
-            #print(df)
-            #print(len(df["RV_flag"]))
-            with open(f"flag_ratios_{instr}.txt", "a") as f: # Write to a text file
+
+            with open(f"flag_ratios_{instr}.txt", "w") as f: # Write to a text file
                 f.write("##########################\n")
                 f.write(f"Star: {target_save_name}\n")
                 f.write(f"Flag ratio: {flag_rv_ratio}\n")
@@ -236,18 +229,16 @@ def main():
                 plt.savefig(folder_path+f"{target_save_name}_{instr}_{line}.pdf", bbox_inches="tight")
                 plt.clf()  
 
-            if flag_rv_ratio > 0:
-                #print(df)
+            if flag_rv_ratio > 0: #if there is at least one spectrum nicely corrected
                 cols = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv']
-                if len(df) > 5:  
+                if len(df) > 10: #perform a sigma-clip  
                     df = sigma_clip(df, cols, sigma=3)
 
                 plt.figure(3)
                 plot_RV_indices(target_save_name, df, indices, save=True, 
                 path_save = folder_path+f"{target_save_name}_{instr}.pdf")
-                #plt.show()
 
-                ind_I_CaII_Rneg = df[df["I_CaII_Rneg"] < 0.01].index
+                ind_I_CaII_Rneg = df[df["I_CaII_Rneg"] < 0.01].index  #if there are a lot of zero fluxes in the window, discard
                 I_CaII_extracted = df.loc[ind_I_CaII_Rneg, "I_CaII"]
                 I_CaII_err_extracted = df.loc[ind_I_CaII_Rneg, "I_CaII_err"]
                 bjd_extracted = df.loc[ind_I_CaII_Rneg, "bjd"]
@@ -256,7 +247,9 @@ def main():
                     n_spec = len(I_CaII_err_extracted)
                 except:
                     n_spec = 0
-                if n_spec >= 30 and t_span >= 2*365:  #only compute periodogram if star has at least 30 spectra in a time span of at least 2 years
+
+                if n_spec >= 30 and t_span >= 2*365:  
+                    #only compute periodogram if star has at least 30 spectra in a time span of at least 2 years
                     period, period_err, flag_period = gls_periodogram(target_save_name, I_CaII_extracted, I_CaII_err_extracted, bjd_extracted, 
                                                         print_info = False, mode = "Period",
                                             save=True, path_save=folder_path+f"{target_save_name}_GLS.pdf")
@@ -288,6 +281,4 @@ Problems with the program:
 
 - ESPRESSO and UVES spectrographs are not yet configured
 - some way of reducing running time, as well as supressing verbose of ESO download
-
-Note: some points have big errors in the indices, see the data frame ESPRESSO: HD115617, HD46375. solved by including the error in flux
 '''

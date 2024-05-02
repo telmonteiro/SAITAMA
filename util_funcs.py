@@ -372,9 +372,7 @@ def get_gaiadr2(name):
   return gaiadr2
 
 ########################
-'''
-These two functions get the Gaia DR3 ID for the star and cleans it to be in the correct format.
-'''
+
 def get_gaia_dr3_id(results_ids):
   for name in results_ids[::-1]:
     if "Gaia DR3 " in name[0]:
@@ -382,6 +380,7 @@ def get_gaia_dr3_id(results_ids):
   return -1
 
 def get_gaiadr3(name):
+  '''Get the Gaia DR3 ID for the star and cleans it to be in the correct format.'''
   customSimbad=Simbad()
   
   if name[-2:] == " A":
@@ -437,7 +436,7 @@ def plot_line(data, line, lstyle = "-"):
     line_wv = lines_list[line]
     
     if line in ["CaIIK","CaIIH"]: window = 12
-    elif line in ["Ha","NaID1","NaID2"]: window = 2
+    elif line in ["Ha","NaID1","NaID2"]: window = 20
     else: window = 0.6
 
     for array in data:
@@ -452,8 +451,11 @@ def plot_line(data, line, lstyle = "-"):
         #flux_normalized = flux/np.linalg.norm(flux)
         flux_normalized = (flux-np.min(flux))/(np.max(flux)-np.min(flux))
         plt.plot(wv, flux_normalized, lstyle)
-        plt.axvline(x=wv[19],ymin=0,ymax=1,ls="--",ms=0.1)
-        plt.axvline(x=wv[-19],ymin=0,ymax=1,ls="--",ms=0.1)
+        if len(flux_normalized) < 40:
+            lim = 4
+        else: lim = 19
+        plt.axvline(x=wv[lim],ymin=0,ymax=1,ls="--",ms=0.1)
+        plt.axvline(x=wv[-lim],ymin=0,ymax=1,ls="--",ms=0.1)
         plt.axvline(x=line_wv-window/30,ymin=0,ymax=1,ls="--",ms=0.1)
         plt.axvline(x=line_wv+window/30,ymin=0,ymax=1,ls="--",ms=0.1)
 
@@ -544,8 +546,11 @@ def line_ratio_indice(data, line="CaI"):
         #flux_normalized = flux/np.linalg.norm(flux)
         flux_normalized = (flux-np.min(flux))/(np.max(flux)-np.min(flux))
 
-        flux_left = np.median(flux_normalized[:20])
-        flux_right = np.median(flux_normalized[:-20])
+        if len(flux_normalized) < 40:
+            lim = 5
+        else: lim = 20
+        flux_left = np.median(flux_normalized[:lim])
+        flux_right = np.median(flux_normalized[:-lim])
         flux_continuum = np.median([flux_left,flux_right]) #median
         #print("Flux continuum: ",flux_continuum)
         
