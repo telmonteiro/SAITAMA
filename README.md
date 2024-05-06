@@ -39,12 +39,12 @@ the pipeline would download the spectra to)
 Returns:
 - creates a folder teste_download_rv_corr/{star} where all the produced files are stored
 - in the subfolder ADP/ the corrected fits files of the spectra are stored
-- {star}_{instrument}_{line}.pdf: plot of the spectra in said line (CaI, CaII H, CaII K, H$\alpha$, HeI, NaID1, NaID2 and FeII)
+- {star}\_{instrument}\_{line}.pdf: plot of the spectra in said line (CaI, CaII H, CaII K, H$\alpha$, HeI, NaID1, NaID2 and FeII)
 - stats_{star}.csv: csv file with a data frame including statistical information like the star name, the indice name and the respective maximum, minimum, mean, median, 
 standard deviation, time span and number of spectra used for that indice
-- df_{star}_{instrument}.csv: csv file with the data frame including the columns_df given as input
+- df\_{star}\_{instrument}.csv: csv file with the data frame including the columns_df given as input
 - {star}_GLS.pdf and {star}_WF.pdf: plots of the periodogram of the CaII H&K indice and the respective Window Function
-- df_stats_{star}.fits: FITS file that includes the data frame given by df\_{star}\_{instrument}.csv in a BINTable format and includes the statistics given in stats_{star}.csv
+- df\_stats\_{star}.fits: FITS file that includes the data frame given by df\_{star}\_{instrument}.csv in a BINTable format and includes the statistics given in stats_{star}.csv
 and informations regarding the periodogram in the header
 - report_periodogram_{star}.txt: txt file that contains a small report on the periodogram computed and the WF, as well as the harmonics
 - flag_ratios_{instrument}.txt: adds to a txt file the names of the badly corrected spectra and the RV flag ratio
