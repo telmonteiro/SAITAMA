@@ -275,7 +275,7 @@ def plot_line(data, line, line_legend="", lstyle = "-", legend_plot = False, plo
     line_wv = lines_list[line]
     
     if line in ["CaIIK","CaIIH"]: window = 12
-    elif line in ["Ha","NaID1","NaID2"]: window = 20
+    elif line in ["Ha","NaID1","NaID2"]: window = 10
     else: window = 0.7
 
     for array in data:

@@ -65,7 +65,8 @@ from util_funcs_2 import (
     stats_indice,plot_RV_indices,
     sigma_clip,gls_periodogram,
     general_fits_file)
-from actin2.actin2 import ACTIN
+
+from actin2 import ACTIN # type: ignore
 
 actin = ACTIN()
 
@@ -171,6 +172,10 @@ def pipeline(stars, instruments,
 
     max_snr_instr = {"HARPS": 550,"ESPRESSO": 1000,"FEROS": 1000,"UVES": 550}  # max SNR to be used to avoid saturation
 
+    # to login into the ESO data base
+    eso.login(username_eso)
+    eso.ROW_LIMIT = -1
+
     for target_save_name in stars:
 
         gaiadr3 = get_gaiadr3(target_save_name)
@@ -185,9 +190,14 @@ def pipeline(stars, instruments,
         print(target_save_name, target_search_name)
 
         # creates folders for the download and then the correct spectra
+        if not os.path.isdir("teste_download"):
+            os.mkdir("teste_download")
         star_folder = f"teste_download/{target_save_name}/"
         if not os.path.isdir(star_folder):
             os.mkdir(star_folder)
+
+        if not os.path.isdir("teste_download_rv_corr"):
+            os.mkdir("teste_download_rv_corr")
         star_folder_rv = f"teste_download_rv_corr/{target_save_name}/"
         if not os.path.isdir(star_folder_rv):
             os.mkdir(star_folder_rv)
@@ -200,10 +210,6 @@ def pipeline(stars, instruments,
             max_snr = max_snr_instr[instr]
             if download == True:
                 print(f"Downloading spectra from {instr} instrument...")
-
-                # to login into the ESO data base
-                eso.login(username_eso)
-                eso.ROW_LIMIT = -1
 
                 logger = logging.getLogger("individual Run")
                 logger.setLevel(logging.INFO)
@@ -364,7 +370,12 @@ def pipeline(stars, instruments,
 
 
 ### Main program:
-def main():
+def main(stars, instruments, columns_df, indices, max_spectra, min_snr, download, neglect_data, username_eso):
+
+    pipeline(stars, instruments, columns_df, indices, max_spectra, min_snr, download, neglect_data, username_eso)
+
+if __name__ == "__main__":
+
     stars = ["HD209100","HD160691","HD115617","HD46375","HD22049","HD102365","HD1461","HD16417","HD10647","HD13445","HD142A",
         "HD108147","HD16141","HD179949","HD47536","HD20794","HD85512","HD192310"]
     instruments = ["UVES"]
@@ -378,14 +389,11 @@ def main():
     max_spectra = 150 # maximum spectra to be selected
     min_snr = 15 #minimum overall SNR
 
-    download = False #download from ESO database?
+    download = True #download from ESO database?
 
     username_eso = "telmonteiro"
 
     # specific data to neglect for any reason
     neglect_data = {"HD20794": "ADP.2020-08-10T15:36:05.310"}
 
-    pipeline(stars, instruments, columns_df, indices, max_spectra, min_snr, download, neglect_data, username_eso)
-
-if __name__ == "__main__":
-    main()
+    main(stars, instruments, columns_df, indices, max_spectra, min_snr, download, neglect_data, username_eso)
