@@ -63,6 +63,10 @@ HD47536 was particularly chosen because it has a low number of spectra available
 
 - Then one runs the ACTINometer by the terminal. To change the input parameters, for now one has to edit them manually inside the script of ACTINometer.py
 
+Dependencies: numpy, matplotlib, tqdm, time, logging, pandas, astroquery, astropy, math, PyAstronomy, ACTIN2
+
+The code was written inside WSL Ubuntu.
+
 ## Problems and future work
 
 - the periodogram computation is under study
