@@ -1,202 +1,14 @@
-from __future__ import print_function, division
-from astroquery.simbad import Simbad
-import numpy as np, pandas as pd, matplotlib.pylab as plt, os, tarfile, glob, math
+'''
+This file contains functions to be used by the pipeline function in the ACTINometer pipeline
+'''
+import numpy as np
+import pandas as pd
+import matplotlib.pylab as plt
+import math
 from astropy.io import fits
-from PyAstronomy import pyasl
-from astroquery.eso import Eso
-from astropy.table import Table, vstack
-from astropy.time import Time
-from PyAstronomy.pyTiming import pyPeriod
-
-eso = Eso()
-
-def _get_simbad_data(star, alerts=True):
-    """Get selected Simbad data for 'star'.
-    Simbad url: http://simbad.cds.unistra.fr/simbad/
-    """
-    customSimbad = Simbad()
-    #Simbad.list_votable_fields() # Uncomment to check all fields available
-    customSimbad.add_votable_fields('flux(V)')
-    customSimbad.add_votable_fields('flux_error(V)')
-    customSimbad.add_votable_fields('flux(B)')
-    customSimbad.add_votable_fields('plx')
-    customSimbad.add_votable_fields('plx_error')
-    customSimbad.add_votable_fields('sptype')
-    customSimbad.add_votable_fields('otype')
-    customSimbad.add_votable_fields('rv_value')
-    customSimbad.add_votable_fields('otypes')
-    customSimbad.add_votable_fields('pmdec')
-    customSimbad.add_votable_fields('pmra')
-    customSimbad.get_votable_fields()
-    err_msg = None
-    try:
-        query = customSimbad.query_object(star)
-    except:
-        err_msg = f"*** ERROR: Could not identify {star}."
-        if alerts:
-            print(err_msg)
-        return None, err_msg
-
-    #print(list(query));sys.exit() # Uncomment to check all query options
-    keys = [
-        'FLUX_V',
-        'FLUX_ERROR_V',
-        'B-V',
-        'PLX_VALUE', # mas
-        'PLX_ERROR',
-        'SP_TYPE',
-        'OTYPE',
-        'RV_VALUE', # km/s
-        'OTYPES',
-        'PMDEC', # mas/yr
-        'PMRA' # mas/yr
-            ]
-
-    results = {}
-    const = np.ma.core.MaskedConstant
-
-    def no_value_found(key, star):
-        err_msg = f"*** ERROR: {star}: No values of {key} in Simbad."
-        if alerts:
-            print(err_msg)
-        return err_msg
-
-    for key in keys:
-        if key == 'B-V':
-            if not isinstance(query['FLUX_V'][0], const) or not isinstance(query['FLUX_V'][0], const):
-                results[key] = query['FLUX_B'][0]-query['FLUX_V'][0]
-
-            else:
-                err_msg = no_value_found(key, star)
-                results[key] = float('nan')
-
-        elif not query[key][0]:
-            err_msg = no_value_found(key, star)
-            results[key] = float('nan')
-
-        elif isinstance(query[key][0], const):
-            err_msg = no_value_found(key, star)
-            results[key] = float('nan')
-
-        elif isinstance(query[key][0], bytes):
-            results[key] = query[key][0].decode('UTF-8')
-
-        else:
-            results[key] = query[key][0]
-
-    return results
-
-##########################
-
-def plot_RV_indices(star,df,indices,save, path_save):
-    """
-    Plot RV and indices given as a function of time
-    """
-    plt.figure(figsize=(6, (len(indices)+1)*2))
-    plt.suptitle(star, fontsize=14)
-    plt.subplot(len(indices)+1, 1, 1)
-    if "rv_err" not in df.columns: yerr = 0
-    else: yerr = df.rv_err
-    plt.errorbar(df.bjd - 2450000, df.rv, yerr, fmt='k.')
-    plt.ylabel("RV [m/s]")
-    #print(indices)
-    for i, index in enumerate(indices):
-        plt.subplot(len(indices)+1, 1, i+2)
-        plt.ylabel(index)
-        plt.errorbar(df.bjd - 2450000, df[index], df[index + "_err"], fmt='k.')
-    plt.xlabel("BJD $-$ 2450000 [days]")
-    plt.subplots_adjust(top=0.95)
-    if save == True:
-        plt.savefig(path_save, bbox_inches="tight")
-
-#########################
-    
-def stats_indice(star,cols,df):
-    """
-    Return pandas data frame with statistical data on the indice(s) given: max, min, mean, median, std and N (number of spectra)
-    """
-    df_stats = pd.DataFrame(columns=["star","indice","max","min","mean","median","std","time_span","N_spectra"])
-    if len(cols) == 1:
-            row = {"star":star,"column":cols,
-                "max":max(df[cols]),"min":min(df[cols]),
-                "mean":np.mean(df[cols]),"median":np.median(df[cols]),
-                "std":np.std(df[cols]),"time_span":max(df["bjd"])-min(df["bjd"]),
-                "N_spectra":len(df[cols])}
-            df_stats.loc[len(df_stats)] = row
-    elif len(cols) > 1:
-        for i in cols:
-            if i != "rv":
-                indices = df[df[i+"_Rneg"] < 0.01].index
-                data = df.loc[indices, i]
-            else: data = df["rv"]
-            if len(data) != 0:
-                row = {"star": star, "indice": i,
-                    "max": max(data), "min": min(data),
-                    "mean": np.mean(data), "median": np.median(data),
-                    "std": np.std(data), "time_span": max(df["bjd"]) - min(df["bjd"]),
-                    "N_spectra": len(data)}
-                df_stats.loc[len(df_stats)] = row
-            else: 
-                row = {"star": star, "indice": i,
-                    "max": 0, "min": 0,
-                    "mean": 0, "median": 0,
-                    "std": 0, "time_span": max(df["bjd"]) - min(df["bjd"]),
-                    "N_spectra": len(data)}
-                df_stats.loc[len(df_stats)] = row
-
-
-    else:
-        print("ERROR: No columns given")
-        df_stats = None
-    
-    return df_stats
-
-########################
-
-def sigma_clip(df, cols, sigma):
-    '''
-    Rough sigma clipping of a data frame.
-    '''
-    for col in cols:
-        if math.isnan(list(df[col])[0]) == False:
-            mean= df[col].mean()
-            std = df[col].std()
-            df = df[(df[col] >= mean - sigma * std) & (df[col] <= mean + sigma * std)]
-    return df
-
-########################
-
-def calc_fits_wv_1d(hdr, key_a='CRVAL1', key_b='CDELT1', key_c='NAXIS1'):
-    '''
-    Compute wavelength axis from keywords on spectrum header.
-    '''
-    try:
-        a = hdr[key_a]; b = hdr[key_b]
-    except KeyError:
-        a = hdr["WAVELMIN"]*10; b = hdr["WAVELMAX"]*10
-    try: 
-        c = hdr[key_c]
-    except KeyError:
-        c = hdr["NELEM"]
-
-    return a + b * np.arange(c)
-
-########################
-
-def correct_spec_rv(wv, rv, units):
-    '''
-    Correct wavelength of spectrum by the RV of the star with a Doppler shift.
-    '''
-    c = 299792.458 #km/s
-    if units == "m/s":
-        c *= 1000
-    #delta_wv = wv * rv / c #shift
-    #wv_corr = wv + delta_wv #o problema era o sinal... é wv - delta_wv
-    wv_corr = wv / (1+rv/c)
-    delta_wv = wv - wv_corr
-    return wv_corr, np.mean(delta_wv)
-
-########################
+from astropy.table import Table
+from PyAstronomy import pyasl # type: ignore
+from PyAstronomy.pyTiming import pyPeriod # type: ignore
 
 def read_fits(file_name,instrument,mode):
     '''
@@ -288,6 +100,102 @@ def read_fits(file_name,instrument,mode):
     return wv, flux, flux_err, header
 
 ########################
+
+def calc_fits_wv_1d(hdr, key_a='CRVAL1', key_b='CDELT1', key_c='NAXIS1'):
+    '''
+    Compute wavelength axis from keywords on spectrum header.
+    '''
+    try:
+        a = hdr[key_a]; b = hdr[key_b]
+    except KeyError:
+        a = hdr["WAVELMIN"]*10; b = hdr["WAVELMAX"]*10
+    try: 
+        c = hdr[key_c]
+    except KeyError:
+        c = hdr["NELEM"]
+
+    return a + b * np.arange(c)
+
+########################
+
+def sigma_clip(df, cols, sigma):
+    '''
+    Rough sigma clipping of a data frame.
+    '''
+    for col in cols:
+        if math.isnan(list(df[col])[0]) == False:
+            mean= df[col].mean()
+            std = df[col].std()
+            df = df[(df[col] >= mean - sigma * std) & (df[col] <= mean + sigma * std)]
+    return df
+
+########################
+
+def plot_RV_indices(star,df,indices,save, path_save):
+    """
+    Plot RV and indices given as a function of time
+    """
+    plt.figure(figsize=(6, (len(indices)+1)*2))
+    plt.suptitle(star, fontsize=14)
+    plt.subplot(len(indices)+1, 1, 1)
+    if "rv_err" not in df.columns: yerr = 0
+    else: yerr = df.rv_err
+    plt.errorbar(df.bjd - 2450000, df.rv, yerr, fmt='k.')
+    plt.ylabel("RV [m/s]")
+    #print(indices)
+    for i, index in enumerate(indices):
+        plt.subplot(len(indices)+1, 1, i+2)
+        plt.ylabel(index)
+        plt.errorbar(df.bjd - 2450000, df[index], df[index + "_err"], fmt='k.')
+    plt.xlabel("BJD $-$ 2450000 [days]")
+    plt.subplots_adjust(top=0.95)
+    if save == True:
+        plt.savefig(path_save, bbox_inches="tight")
+
+#########################
+    
+def stats_indice(star,cols,df):
+    """
+    Return pandas data frame with statistical data on the indice(s) given: max, min, mean, median, std and N (number of spectra)
+    """
+    df_stats = pd.DataFrame(columns=["star","indice","max","min","mean","median","std","time_span","N_spectra"])
+    if len(cols) == 1:
+            row = {"star":star,"column":cols,
+                "max":max(df[cols]),"min":min(df[cols]),
+                "mean":np.mean(df[cols]),"median":np.median(df[cols]),
+                "std":np.std(df[cols]),"time_span":max(df["bjd"])-min(df["bjd"]),
+                "N_spectra":len(df[cols])}
+            df_stats.loc[len(df_stats)] = row
+    elif len(cols) > 1:
+        for i in cols:
+            if i != "rv":
+                indices = df[df[i+"_Rneg"] < 0.01].index
+                data = df.loc[indices, i]
+            else: data = df["rv"]
+            if len(data) != 0:
+                row = {"star": star, "indice": i,
+                    "max": max(data), "min": min(data),
+                    "mean": np.mean(data), "median": np.median(data),
+                    "std": np.std(data), "time_span": max(df["bjd"]) - min(df["bjd"]),
+                    "N_spectra": len(data)}
+                df_stats.loc[len(df_stats)] = row
+            else: 
+                row = {"star": star, "indice": i,
+                    "max": 0, "min": 0,
+                    "mean": 0, "median": 0,
+                    "std": 0, "time_span": max(df["bjd"]) - min(df["bjd"]),
+                    "N_spectra": len(data)}
+                df_stats.loc[len(df_stats)] = row
+
+
+    else:
+        print("ERROR: No columns given")
+        df_stats = None
+    
+    return df_stats
+
+########################
+
 def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, template_spec, drv, units, instrument):
     '''
     Uses crosscorrRV function from PyAstronomy to get the CCF of the star comparing with a spectrum of the Sun.
@@ -343,91 +251,22 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
     
     return bjd, radial_velocity, cc[maxind], np.around(rv,0), cc, w, f
 
-########################
-'''
-These two functions get the Gaia DR2 ID for the star and cleans it to be in the correct format.
-'''
-def get_gaia_dr2_id(results_ids):
-  for name in results_ids[::-1]:
-    if "Gaia DR2 " in name[0]:
-      return name[0].split(" ")[-1]
-  return -1
-
-def get_gaiadr2(name):
-  customSimbad=Simbad()
-  
-  if name[-2:] == " A":
-    name =  name[:-2]
-  if "(AB)" in name:
-    name = name.replace("(AB)", "")
-  if "Qatar" in name:
-    name = name.replace("-","")
-
-  result_ids = customSimbad.query_objectids(name)
-  if result_ids is None:
-    gaiadr2 = -1
-  else:
-
-    gaiadr2 = get_gaia_dr2_id(result_ids)
-  return gaiadr2
+def correct_spec_rv(wv, rv, units):
+    '''
+    Correct wavelength of spectrum by the RV of the star with a Doppler shift.
+    '''
+    c = 299792.458 #km/s
+    if units == "m/s":
+        c *= 1000
+    #delta_wv = wv * rv / c #shift
+    #wv_corr = wv + delta_wv #o problema era o sinal... é wv - delta_wv
+    wv_corr = wv / (1+rv/c)
+    delta_wv = wv - wv_corr
+    return wv_corr, np.mean(delta_wv)
 
 ########################
 
-def get_gaia_dr3_id(results_ids):
-  for name in results_ids[::-1]:
-    if "Gaia DR3 " in name[0]:
-      return name[0].split(" ")[-1]
-  return -1
-
-def get_gaiadr3(name):
-  '''Get the Gaia DR3 ID for the star and cleans it to be in the correct format.'''
-  customSimbad=Simbad()
-  
-  if name[-2:] == " A":
-    name =  name[:-2]
-  if "(AB)" in name:
-    name = name.replace("(AB)", "")
-  if "Qatar" in name:
-    name = name.replace("-","")
-
-  result_ids = customSimbad.query_objectids(name)
-  if result_ids is None:
-    gaiadr3 = -1
-  else:
-
-    gaiadr3 = get_gaia_dr3_id(result_ids)
-  return gaiadr3
-
-########################
-
-def choose_snr(snr_arr, min_snr = 15, max_snr = 550):
-  """Function to select the individual spectra given their respective minimum SNR"""
-  #print("Min snr:", min_snr)
-  #print("Max snr:", max_snr)
-  index_cut = np.where((snr_arr > min_snr) & (snr_arr < max_snr))
-  if len(index_cut[0]) == 0:
-    print("Not enough SNR")
-    return ([],)
-  return index_cut
-
-########################
-
-def check_downloaded_data(path_download):
-  """Report on the downloaded data: showing the potential snr for the combined spectrum"""
-  files_fits = glob.glob(path_download+"*.fits")
-  if len(files_fits) > 0:
-    snr_arr = np.array([fits.getheader(filef)["SNR"] for filef in files_fits])
-    max_down_snr = np.max(snr_arr)
-    min_down_snr = np.min(snr_arr)
-    print ("Download: Min SNR %7.1f - Max SNR %7.1f; nspec: %d" % (min_down_snr, max_down_snr, len(snr_arr)))
-  else:
-    print("No downloaded files? All private?")
-    snr_arr = []
-  return snr_arr
-
-########################
-
-def plot_line(data, line, lstyle = "-"):
+def plot_line(data, line, line_legend="", lstyle = "-", legend_plot = False, plot_continuum_vlines = True, plot_lines_vlines = True):
     '''
     Plots the spectra used in the position of a reference line to check if everything is alright.
     '''
@@ -437,7 +276,7 @@ def plot_line(data, line, lstyle = "-"):
     
     if line in ["CaIIK","CaIIH"]: window = 12
     elif line in ["Ha","NaID1","NaID2"]: window = 20
-    else: window = 0.6
+    else: window = 0.7
 
     for array in data:
         wv = array[0]; flux = array[1]
@@ -450,76 +289,23 @@ def plot_line(data, line, lstyle = "-"):
         flux = flux[wv_array]
         #flux_normalized = flux/np.linalg.norm(flux)
         flux_normalized = (flux-np.min(flux))/(np.max(flux)-np.min(flux))
-        plt.plot(wv, flux_normalized, lstyle)
+        plt.plot(wv, flux_normalized, lstyle, label=line_legend)
         if len(flux_normalized) < 40:
             lim = 4
         else: lim = 19
-        plt.axvline(x=wv[lim],ymin=0,ymax=1,ls="--",ms=0.1)
-        plt.axvline(x=wv[-lim],ymin=0,ymax=1,ls="--",ms=0.1)
-        plt.axvline(x=line_wv-window/30,ymin=0,ymax=1,ls="--",ms=0.1)
-        plt.axvline(x=line_wv+window/30,ymin=0,ymax=1,ls="--",ms=0.1)
+        if plot_continuum_vlines == True:
+            plt.axvline(x=wv[lim],ymin=0,ymax=1,ls="--",ms=0.1)
+            plt.axvline(x=wv[-lim],ymin=0,ymax=1,ls="--",ms=0.1)
+        if plot_lines_vlines == True:
+            plt.axvline(x=line_wv-window/30,ymin=0,ymax=1,ls="--",ms=0.1)
+            plt.axvline(x=line_wv+window/30,ymin=0,ymax=1,ls="--",ms=0.1)
 
     plt.axvline(x=line_wv,ymin=0,ymax=1,ls="-",ms=0.2)
+    if legend_plot == True: plt.legend()
     
 
     plt.xlabel(r"Wavelength ($\AA$)"); plt.ylabel("Normalized Flux")
     plt.title(f"{line} line")
-
-#######################
-
-def select_best_spectra(spectra_table, max_spectra=200):
-    '''
-    Selects the best spectra from the ESO data base while maintaining a good time span (normally the maximum).
-    Groups my month and year, orders each group by SNR. 
-    Then iterates for each group, adding to the new table the best SNR spectra until the maximum number of spectra is achieved.
-    '''
-    #Astropy Time to handle date parsing, allowing for invalid dates
-    date_obs_np = Time(spectra_table['Date Obs'], format='isot', scale='utc')
-
-    #filter out invalid dates
-    valid_mask = ~date_obs_np.mask
-    spectra_table = spectra_table[valid_mask]
-
-    #extract year and month
-    year_month = np.array([(d.datetime64.astype('datetime64[Y]').item(), d.datetime64.astype('datetime64[M]').item()) for d in date_obs_np])
-
-    #add 'year' and 'month' columns to the table
-    spectra_table['year'] = np.array([str(x)[:4] for x in year_month[:, 0]])
-    spectra_table['month'] = np.array([str(x)[5:-3] for x in year_month[:, 1]])
-
-    #group by 'year' and 'month'
-    grouped = spectra_table.group_by(['year', 'month'])
-
-    selected_spectra = Table()
-    excess_spectra = max_spectra
-
-    max_group_length = max(len(group) for group in grouped.groups)
-
-    for i in range(max_group_length):
-        for group in grouped.groups: #for each month of each year
-            if i < len(group):  #check if the current index is within the length of the group
-                sorted_group = group[np.argsort(group['SNR'])[::-1]] #sort by descending order of SNR
-
-                if excess_spectra > 0:
-                    selected_spectra = vstack([selected_spectra, sorted_group[i:i + 1]])
-                    excess_spectra -= 1
-                else:
-                    break
-        
-        #print(f"Iteration {i + 1}: selected_spectra length = {len(selected_spectra)}, excess_spectra = {excess_spectra}")
-
-        if excess_spectra <= 0:
-            break
-
-    #calculate and print time span
-    min_date = min(date_obs_np[valid_mask]).datetime64.astype('datetime64[D]').item()
-    max_date = max(date_obs_np[valid_mask]).datetime64.astype('datetime64[D]').item()
-    days_span = (max_date - min_date).total_seconds() / (24 * 3600)
-    print(f"Start Date: {min_date}")
-    print(f"End Date: {max_date}")
-    print(f"Days Span: {days_span} days")
-
-    return selected_spectra
 
 ################################
 
@@ -567,7 +353,6 @@ def line_ratio_indice(data, line="CaI"):
          
     return ratio_arr, center_flux_line_arr, flux_continuum_arr
 
-
 def flag_ratio_RV_corr(files,instr):
     '''
     For each spectrum, run an interval of offsets and if the minimum ratio is not in [-0.02,0.02], raises a flag = 1.
@@ -596,52 +381,6 @@ def flag_ratio_RV_corr(files,instr):
     flag_ratio = N_good_spec / len(flag_list)
 
     return flag_ratio, flag_list
-
-#################################
-    
-def general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_period, flag_rv_ratio):
-    '''
-    Takes the data array that consists in a 3D cube containing the wavelength and flux for each spectrum used and
-    the data frame with the statistics.
-    '''
-    hdr = fits.Header() 
-
-    if math.isnan(float(period_err)): period_err = 0
-
-    star_id = stats_df["star"][0]; time_span = stats_df["time_span"][0]; #N_spectra = stats_df["N_spectra"][0]
-    dict_hdr = {"STAR_ID":[star_id,'Star ID in HD catalogue'],
-                "INSTR":[instr,"Instrument used"],
-                "TIME_SPAN":[time_span, 'Time span in days between first and last observations used'],
-                #"N_SPECTRA":[N_spectra,"Number of spectra used"],
-                "SNR_MIN":[min_snr,"Minimum SNR"],
-                "SNR_MAX":[max_snr,"Maximum SNR"],
-                "PERIOD_I_CaII":[period,"Period of CaII activity index"],
-                "PERIOD_I_CaII_ERR":[period_err,"Error of period of CaII activity index"],
-                "FLAG_PERIOD":[flag_period,"Goodness of periodogram fit flag. Color based."],
-                "FLAG_RV":[flag_rv_ratio,"Goodness of RV correction indicador. 1 = all good"],
-                "COMMENT":["Spectra based on SNR - time span trade-off","Comment"],
-                "COMMENT1":["RV obtained from CCF measure (m/s)","Comment"],
-                "COMMENT2":["3D data of wv (Angs) and flux of each spectrum","Comment"]}
-
-    indices = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv']
-    stats = ["max","min","mean","median","std","N_spectra"]
-
-    for i,ind in enumerate(indices):
-        for col in stats:
-            stat = stats_df[col][i]
-            if col == "rv": comment = f"{col} of {ind.upper()} (m/s)"
-            elif col == "N_spectra": comment = f"Nr of spectra used in {ind}"
-            else: comment = f"{col} of {ind}"
-            dict_hdr[ind.upper()+"_"+col.upper()] = [stat,comment]
-    
-    for keyword in dict_hdr.keys():
-        hdr.append(("HIERARCH "+keyword, dict_hdr[keyword][0], dict_hdr[keyword][1]), end=True)
-
-    df.columns = df.columns.astype(str)
-    table = Table.from_pandas(df)
-    hdul = fits.BinTableHDU(data=table, header=hdr)
-
-    hdul.writeto(file_path, overwrite=True)
 
 #################################
 
@@ -740,6 +479,86 @@ def gls_periodogram(star, I_CaII, I_CaII_err, bjd, print_info, mode, save, path_
         plt.savefig(path_save, bbox_inches="tight")
 
     return round(period,3), round(period_err,3), flag
+
+def get_report_periodogram(hdr,gaps,period,period_err,flag_period,harmonics_list,period_WF,period_err_WF,folder_path):
+    instr = hdr["INSTR"]; star = hdr["STAR_ID"]
+    t_span = hdr["TIME_SPAN"]
+    snr_min = hdr["SNR_MIN"]; snr_max = hdr["SNR_MAX"]
+    n_spec = hdr["I_CAII_N_SPECTRA"]
+    flag_rv = hdr["FLAG_RV"]
+
+    name_file = folder_path+f"report_periodogram_{star}.txt"
+    with open(name_file, "w") as f:
+        f.write("###"*30+"\n")
+        f.write("\n")
+        f.write("Periodogram Report\n")
+        f.write("---"*30+"\n")
+        f.write(f"Star: {star}\n")
+        f.write(f"Instrument: {instr}\n")
+        f.write(f"SNR: {snr_min} - {snr_max}\n")
+        f.write(f"RV flag: {flag_rv}\n")
+        f.write(f"Time Span: {t_span}\n")
+        f.write(f"Number of spectra: {n_spec}\n")
+        f.write("---"*30+"\n")
+        f.write(f"Period I_CaII: {period} +/- {period_err} days\n")
+        f.write(f"Period flag: {flag_period}\n")
+        f.write(f"Harmonics: {harmonics_list}\n")
+        f.write(f"Time gaps between data points: {gaps}\n")
+        f.write(f"Window Function Period: {period_WF} +/- {period_err_WF} days\n")
+        f.write("\n")
+        f.write("###"*30+"\n")
+    
+    f = open(name_file, 'r')
+    file_contents = f.read()
+    f.close()
+
+    return file_contents
+
+#################################
+    
+def general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_period, flag_rv_ratio):
+    '''
+    Takes the data array that consists in a 3D cube containing the wavelength and flux for each spectrum used and
+    the data frame with the statistics.
+    '''
+    hdr = fits.Header() 
+
+    if math.isnan(float(period_err)): period_err = 0
+
+    star_id = stats_df["star"][0]; time_span = stats_df["time_span"][0]; #N_spectra = stats_df["N_spectra"][0]
+    dict_hdr = {"STAR_ID":[star_id,'Star ID in HD catalogue'],
+                "INSTR":[instr,"Instrument used"],
+                "TIME_SPAN":[time_span, 'Time span in days between first and last observations used'],
+                #"N_SPECTRA":[N_spectra,"Number of spectra used"],
+                "SNR_MIN":[min_snr,"Minimum SNR"],
+                "SNR_MAX":[max_snr,"Maximum SNR"],
+                "PERIOD_I_CaII":[period,"Period of CaII activity index"],
+                "PERIOD_I_CaII_ERR":[period_err,"Error of period of CaII activity index"],
+                "FLAG_PERIOD":[flag_period,"Goodness of periodogram fit flag. Color based."],
+                "FLAG_RV":[flag_rv_ratio,"Goodness of RV correction indicador. 1 = all good"],
+                "COMMENT":["Spectra based on SNR - time span trade-off","Comment"],
+                "COMMENT1":["RV obtained from CCF measure (m/s)","Comment"],
+                "COMMENT2":["3D data of wv (Angs) and flux of each spectrum","Comment"]}
+
+    indices = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv']
+    stats = ["max","min","mean","median","std","N_spectra"]
+
+    for i,ind in enumerate(indices):
+        for col in stats:
+            stat = stats_df[col][i]
+            if col == "rv": comment = f"{col} of {ind.upper()} (m/s)"
+            elif col == "N_spectra": comment = f"Nr of spectra used in {ind}"
+            else: comment = f"{col} of {ind}"
+            dict_hdr[ind.upper()+"_"+col.upper()] = [stat,comment]
+    
+    for keyword in dict_hdr.keys():
+        hdr.append(("HIERARCH "+keyword, dict_hdr[keyword][0], dict_hdr[keyword][1]), end=True)
+
+    df.columns = df.columns.astype(str)
+    table = Table.from_pandas(df)
+    hdul = fits.BinTableHDU(data=table, header=hdr)
+
+    hdul.writeto(file_path, overwrite=True)
 
 #################################
 

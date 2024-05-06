@@ -76,3 +76,13 @@ Bad spectrum: teste_download/HD20794/HD20794_UVES/ADP/ADP.2020-06-09T17:00:02.05
 ##########################
 Star: HD192310
 Flag ratio: 1.0
+##########################
+Star: HD13445
+Flag ratio: 1.0
+##########################
+Star: HD16141
+Flag ratio: 0.6666666666666666
+Bad spectrum: teste_download/HD16141/HD16141_UVES/ADP/ADP.2020-07-17T12:15:19.106.fits
+Bad spectrum: teste_download/HD16141/HD16141_UVES/ADP/ADP.2020-07-17T12:15:19.085.fits
+Bad spectrum: teste_download/HD16141/HD16141_UVES/ADP/ADP.2020-07-17T12:16:34.400.fits
+Bad spectrum: teste_download/HD16141/HD16141_UVES/ADP/ADP.2020-07-17T12:17:37.464.fits

@@ -170,3 +170,7 @@ Flag ratio: 1.0
 ##########################
 Star: HD192310
 Flag ratio: 1.0
+##########################
+Star: HD13445
+Flag ratio: 0.9918032786885246
+Bad spectrum: teste_download/HD13445/HD13445_HARPS/ADP/ADP.2018-10-14T01:03:16.124.fits
