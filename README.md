@@ -59,7 +59,9 @@ HD47536 was particularly chosen because it has a low number of spectra available
 
 ### Running the pipeline
 
-- To run the RV correction a file containing a reference spectra is needed. I recommend using the Sun spectrum given along this pipeline, because the reading of this spectra is adapted to it
+- For now, running the pipeline is a bit complicated. First, one has to clone the ACTIN2 repository (https://github.com/gomesdasilva/ACTIN2). Then, clone this repository inside the folder of ACTIN2, so that ACTINometer.py is in the same folder as actin2 folder. This is made this way to ease the import of the ACTIN2 module.
+
+- Then one runs the ACTINometer by the terminal. To change the input parameters, for now one has to edit them manually inside the script of ACTINometer.py
 
 ## Problems and future work
 
