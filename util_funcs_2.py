@@ -10,6 +10,8 @@ from astropy.table import Table
 from PyAstronomy import pyasl # type: ignore
 from PyAstronomy.pyTiming import pyPeriod # type: ignore
 
+from util_funcs_1 import _get_simbad_data
+
 def read_fits(file_name,instrument,mode):
     '''
     Read fits file and get header and data. Varies if instrument is HARPS, ESPRESSO, UVES or FEROS. missing espresso
@@ -275,7 +277,7 @@ def plot_line(data, line, line_legend="", lstyle = "-", legend_plot = False, plo
     line_wv = lines_list[line]
     
     if line in ["CaIIK","CaIIH"]: window = 12
-    elif line in ["Ha","NaID1","NaID2"]: window = 10
+    elif line in ["Ha","NaID1","NaID2"]: window = 20
     else: window = 0.7
 
     for array in data:
