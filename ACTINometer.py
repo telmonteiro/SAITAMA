@@ -314,7 +314,7 @@ def pipeline(stars, instruments,
             # plot the wavelength of known lines to check if RV correction is good
             for line in ["Ha", "CaIIH", "CaIIK", "FeII", "NaID1", "NaID2", "HeI", "CaI"]:
                 plt.figure(2)
-                plot_line(data=data_array, line=line)
+                plot_line(data=data_array, line=line, line_color=None)
                 plt.savefig(folder_path+ f"{target_save_name}_{instr}_{line}.pdf",bbox_inches="tight",)
                 plt.clf()
 
@@ -378,6 +378,7 @@ if __name__ == "__main__":
 
     stars = ["HD209100","HD160691","HD115617","HD46375","HD22049","HD102365","HD1461","HD16417","HD10647","HD13445","HD142A",
         "HD108147","HD16141","HD179949","HD47536","HD20794","HD85512","HD192310"]
+    #stars = ["HD47536"]
     instruments = ["UVES"]
     columns_df = [
         "I_CaII","I_CaII_err","I_CaII_Rneg",

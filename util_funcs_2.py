@@ -268,7 +268,7 @@ def correct_spec_rv(wv, rv, units):
 
 ########################
 
-def plot_line(data, line, line_legend="", lstyle = "-", legend_plot = False, plot_continuum_vlines = True, plot_lines_vlines = True):
+def plot_line(data, line, line_color, line_legend="", lstyle = "-", normalize=True, legend_plot = False, plot_continuum_vlines = True, plot_lines_vlines = True):
     '''
     Plots the spectra used in the position of a reference line to check if everything is alright.
     '''
@@ -277,7 +277,7 @@ def plot_line(data, line, line_legend="", lstyle = "-", legend_plot = False, plo
     line_wv = lines_list[line]
     
     if line in ["CaIIK","CaIIH"]: window = 12
-    elif line in ["Ha","NaID1","NaID2"]: window = 12
+    elif line in ["Ha","NaID1","NaID2"]: window = 22
     else: window = 0.7
 
     for array in data:
@@ -290,8 +290,10 @@ def plot_line(data, line, line_legend="", lstyle = "-", legend_plot = False, plo
         wv = wv[wv_array]
         flux = flux[wv_array]
         #flux_normalized = flux/np.linalg.norm(flux)
-        flux_normalized = (flux-np.min(flux))/(np.max(flux)-np.min(flux))
-        plt.plot(wv, flux_normalized, lstyle, label=line_legend)
+        if normalize == True:
+            flux_normalized = (flux-np.min(flux))/(np.max(flux)-np.min(flux))
+        else: flux_normalized = flux
+        plt.plot(wv, flux_normalized, lstyle, label=line_legend, color=line_color)
         if len(flux_normalized) < 40:
             lim = 4
         else: lim = 19
@@ -305,8 +307,9 @@ def plot_line(data, line, line_legend="", lstyle = "-", legend_plot = False, plo
     plt.axvline(x=line_wv,ymin=0,ymax=1,ls="-",ms=0.2)
     if legend_plot == True: plt.legend()
     
-
-    plt.xlabel(r"Wavelength ($\AA$)"); plt.ylabel("Normalized Flux")
+    if normalize == True: ylab = "Normalized Flux"
+    else: ylab = "Flux"
+    plt.xlabel(r"Wavelength ($\AA$)"); plt.ylabel(ylab)
     plt.title(f"{line} line")
 
 ################################

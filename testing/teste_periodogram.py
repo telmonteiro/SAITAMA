@@ -1,8 +1,7 @@
-import numpy as np, pandas as pd, matplotlib.pylab as plt, os, glob
+import numpy as np, pandas as pd, matplotlib.pylab as plt
 from astropy.io import fits
-from util_funcs import read_bintable
-from PyAstronomy.pyTiming import pyPeriod
-from report_generator import get_report_periodogram
+from PyAstronomy.pyTiming import pyPeriod # type: ignore
+from util_funcs_2 import get_report_periodogram, read_bintable
 
 def are_harmonics(period1, period2, tolerance=0.01):
     ratio = period1 / period2
@@ -18,7 +17,7 @@ def get_harmonic_list(period_list, power, plevels):
     harmonics_list = []
     for i in range(len(top_5_period)):
         for j in range(i+1, len(top_5_period)):
-            if are_harmonics(top_5_period[j], top_5_period[i], tolerance=0.01):
+            if are_harmonics(top_5_period[j], top_5_period[i], tolerance=0.1):
                 print(f"Period {top_5_period[i]} and {top_5_period[j]} are harmonics of each other")
                 harmonics_list.append([top_5_period[i], top_5_period[j]])
     return harmonics_list
@@ -50,15 +49,15 @@ def periodogram_flagging(harmonics_list, period, period_err, power_list, plevels
     return flag
 
 def WF_periodogram(star, bjd, print_info, save, path_save):
-    time_start = np.min(bjd); time_end = np.max(bjd)
-    time_array = np.linspace(time_start, time_end, int(time_end - time_start))
-    zeros_array = np.zeros_like(time_array); ones_array = np.ones_like(bjd)
-    time = np.concatenate((time_array, bjd))
-    ones_zeros = np.concatenate((zeros_array, ones_array))
+    #time_array = np.linspace(np.min(bjd), np.max(bjd), int(np.max(bjd) - np.min(bjd)))
+    #zeros_array = np.zeros_like(time_array); ones_array = np.ones_like(bjd)
+    #time = np.concatenate((time_array, bjd))
+    #ones_zeros = np.concatenate((zeros_array, ones_array))
 
-    print(f"BJD array has {bjd.shape[0]} and ones_zeros has {len([x for x in ones_zeros if x == 1])} 1s")
+    #print(f"BJD array has {bjd.shape[0]} and ones_zeros has {len([x for x in ones_zeros if x == 1])} 1s")
+    #time = bjd; ones_zeros = np.ones_like(bjd)
 
-    clp_WF = pyPeriod.Gls((time, ones_zeros), norm="ZK", verbose=print_info,ofac=30)
+    clp_WF = pyPeriod.Gls((bjd, np.zeros_like(bjd)), verbose=print_info)
     dic_clp_WF = clp_WF.info(noprint=True)
     period_WF = dic_clp_WF["best_sine_period"]; period_err_WF = dic_clp_WF["best_sine_period_err"]
     fapLevels = np.array([0.05, 0.01]) # Define FAP levels of 5% and 1%
@@ -70,7 +69,7 @@ def WF_periodogram(star, bjd, print_info, save, path_save):
     #print(clp_WF.power)
     #harmonics_list = get_harmonic_list(period_list_WF, clp_WF.power, plevels)
     plt.plot(period_list_WF, clp_WF.power, 'b-')
-    plt.xlim([0, period_WF+15000])
+    plt.xlim([0, period_WF+500])
     plt.title(f"Power vs Period for GLS Periodogram {star} Window Function")
     
     for i in range(len(fapLevels)): # Add the FAP levels to the plot
@@ -79,7 +78,6 @@ def WF_periodogram(star, bjd, print_info, save, path_save):
     plt.legend()
 
     if save == True: plt.savefig(path_save, bbox_inches="tight")
-    plt.clf()
 
     return round(period_WF,3), round(period_err_WF,3)
 
@@ -127,15 +125,14 @@ def gls_periodogram(star, I_CaII, I_CaII_err, bjd, print_info, save, path_save, 
 
     plt.subplots_adjust(top=0.85)
     if save == True: plt.savefig(path_save, bbox_inches="tight")
-    plt.clf()
 
     return round(period,3), round(period_err,3), flag, harmonics_list
 
-#star = "HD20794"
+stars = ["HD209100"]
 instr = "HARPS"
-stars = ['HD209100', 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461', 
-        'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536',
-        'HD20794',"HD85512","HD192310"] 
+#stars = ['HD209100', 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461', 
+#        'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536',
+#        'HD20794',"HD85512","HD192310"] 
 
 for star in stars:
     print(f"{star} with {instr} data")
@@ -149,16 +146,17 @@ for star in stars:
         gaps = gaps_time(df["bjd"])
         print("Gaps in BJD:", gaps)
         period, period_err, flag_period, harmonics_list = gls_periodogram(star, df["I_CaII"],df["I_CaII_err"],df["bjd"], 
-                                            print_info = False, save=True, path_save=folder_path+f"{star}_GLS.png")
+                                            print_info = False, save=False, path_save=folder_path+f"{star}_GLS.png")
         print(f"Period of I_CaII: {period} +/- {period_err} days")
 
         period_WF, period_err_WF = WF_periodogram(star, df["bjd"]-2450000, print_info=False, 
-                                                save=True, path_save=folder_path+f"{star}_WF.png")
+                                                save=False, path_save=folder_path+f"{star}_WF.png")
         print(f"Period of WF: {period_WF} +/- {period_err_WF} days")
 
-        report_periodogram = get_report_periodogram(hdr,gaps,period,period_err,flag_period,harmonics_list,period_WF,period_err_WF,folder_path=folder_path)
-        #print(report_periodogram)
+        report_periodogram = get_report_periodogram(hdr,gaps,period,period_err,flag_period,harmonics_list,
+                                                    period_WF,period_err_WF,folder_path=folder_path)
+        print(report_periodogram)
     else: 
         period = None; period_err = None 
 
-#plt.show()
+plt.show()

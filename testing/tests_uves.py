@@ -1,6 +1,27 @@
 import pandas as pd, numpy as np, matplotlib.pyplot as plt, os, glob
-from util_funcs import read_bintable
+from util_funcs_2 import read_bintable, plot_line, read_fits
 from astropy.io import fits
+
+def actin_manual_Ha06(wv, flux):
+    '''Manual rough estimate of I_Halpha by taking the reference and activity lines and computing the ratio between
+    the mean of the activity line (L1) and the reference lines (R1 and R2) for the Halpha at 0.6 Angstrom'''
+    wc_R1 = 6550.870; bandwith_R1 = 10.75
+    wv_R1 = np.where((wc_R1-bandwith_R1/2 <= wv) & (wv <= wc_R1+bandwith_R1/2))
+    flux_R1 = flux[wv_R1]
+    mean_flux_R1 = np.mean(flux_R1)
+    
+    wc_R2 = 6580.310; bandwith_R2 = 8.75
+    wv_R2 = np.where((wc_R2-bandwith_R2/2 <= wv) & (wv <= wc_R2+bandwith_R2/2))
+    flux_R2 = flux[wv_R2]
+    mean_flux_R2 = np.mean(flux_R2)   
+
+    wc_L1 = 6562.808; bandwith_L1 = 0.6
+    wv_L1 = np.where((wc_L1-bandwith_L1/2 <= wv) & (wv <= wc_L1+bandwith_L1/2))
+    flux_L1 = flux[wv_L1]
+    mean_flux_L1 = np.mean(flux_L1)  
+    
+    return mean_flux_L1/(mean_flux_R1 + mean_flux_R2)
+
 
 def get_keys_spec(file):
     '''Getting spectral resolution and climate conditions (mean air mass, wind speed, relative humidty and temperature)'''
@@ -58,7 +79,7 @@ stars_dic = {
 }
 
 stars = stars_dic.keys()
-#stars = ["HD102365"]
+stars = ["HD102365"]
 for star in stars:
     file_uves = glob.glob(os.path.join(f"teste_download_rv_corr/{star}/{star}_UVES/", f"df_stats_{star}.fits"))
     if file_uves == []:
@@ -103,7 +124,7 @@ for star in stars:
     ax4.scatter(df_harps['bjd'] - 2450000, df_harps['mean_airmass'], color='black', label='HARPS')
     ax4.set_xlabel("BJD $-$ 2450000 [days]"); ax4.set_ylabel("Mean Airmass"); ax4.legend()
     plt.tight_layout()
-    plt.savefig(f"uves_tests_fig/{star}_meteorology.pdf",overwrite=True, format = 'pdf', dpi=300)
+    #plt.savefig(f"uves_tests_fig/{star}_meteorology.pdf",overwrite=True, format = 'pdf', dpi=300)
 
     fig = plt.figure(1,figsize=(16, 8), constrained_layout=True)
     ax1 = plt.subplot2grid((2, 3), (0, 0))
@@ -113,7 +134,7 @@ for star in stars:
     ax5 = plt.subplot2grid((2, 3), (1, 2))
     fig.suptitle(star, fontsize=14)
 
-    print(df_uves[["RV_flag","I_Ha06","file","rv","spec_res"]])
+    #print(df_uves[["RV_flag","I_Ha06","file","rv","spec_res"]])
 
     ax1.scatter(df_uves.loc[~mask, 'bjd'] - 2450000, df_uves.loc[~mask, 'SNR'], label=f'I_Ha06 >= {outlier_up}')
     ax1.scatter(df_uves.loc[mask, 'bjd'] - 2450000, df_uves.loc[mask, 'SNR'], color='red', label=f'I_Ha06 < {outlier_down}')
@@ -138,9 +159,51 @@ for star in stars:
     ax5.scatter(df_harps['bjd'] - 2450000, df_harps['spec_res'], color='black',label="HARPS")
     ax5.set_xlabel("BJD $-$ 2450000 [days]"); ax5.set_ylabel("Spectral Resolution"); ax5.legend()
 
+    #outlier_point = df_uves.loc[mask, ['spec_res',"file","bjd"]].iloc[:1]
+    #non_outlier_low_res = df_uves.loc[~mask, ['spec_res',"file","bjd"]].iloc[4:5]
+    #non_outlier_high_res = df_uves.loc[~mask, ['spec_res',"file","bjd"]].iloc[:1]
+    #harps_point = df_harps[['spec_res',"file","bjd"]].iloc[:1]
+
+    outlier_point = df_uves.loc[mask, ['spec_res',"file","bjd"]].iloc[:1]
+    non_outlier_high_res = df_uves.loc[~mask, ['spec_res',"file","bjd"]].iloc[:1]
+    harps_point = df_harps[['spec_res',"file","bjd"]].iloc[:1]
+    list_points = [outlier_point,non_outlier_high_res,harps_point]
+    list_labels = ["outlier","non-outlier","HARPS"]
+
+    plt.figure(3, figsize=(12,8))
+    instr = "UVES"
+    #labels_HD115617 = [f"Outlier, Res: {outlier_point['spec_res'].values[0]}", f"Non-outlier, Res: {non_outlier_low_res['spec_res'].values[0]}", 
+    #          f"Non-outlier, Res: {non_outlier_high_res['spec_res'].values[0]}", f"HARPS, Res: {harps_point['spec_res'].values[0]}"]
+    #labels_HD16141 = [f"Outlier, Res: {outlier_point['spec_res'].values[0]}, BJD: {round(outlier_point['bjd'].values[0]) - 2450000}", 
+    #          f"Non-outlier, Res: {non_outlier_high_res['spec_res'].values[0]}, BJD: {round(non_outlier_high_res['bjd'].values[0]) - 2450000}", 
+    #          f"HARPS, Res: {harps_point['spec_res'].values[0]}, BJD: {round(harps_point['bjd'].values[0]) - 2450000}"]
+    labels_HD1461 = [f"Outlier, Res: {outlier_point['spec_res'].values[0]}, BJD: {round(outlier_point['bjd'].values[0]) - 2450000}", 
+              f"Non-outlier, Res: {non_outlier_high_res['spec_res'].values[0]}, BJD: {round(non_outlier_high_res['bjd'].values[0]) - 2450000}", 
+              f"HARPS, Res: {harps_point['spec_res'].values[0]}, BJD: {round(harps_point['bjd'].values[0]) - 2450000}"]
+    offset = [0,0,0]
+    color_list = ["red","blue","black"]
+    for i,spec in enumerate(list_points):
+        if i == len(list_points): instr = "HARPS"
+        file = spec["file"].values[0].replace('teste_download', 'teste_download_rv_corr')
+        wv, flux, flux_err, hdr = read_fits(file,instrument=instr,mode="rv_corrected")
+        plot_line(data=[(wv+offset[i],flux)], line="Ha", normalize=False, line_color=color_list[i], line_legend=labels_HD1461[i], legend_plot = True, 
+                  plot_continuum_vlines = False, plot_lines_vlines = False)
+        #activity line bandpass
+        plt.axvline(x=6562.808-0.6/2,ymin=0,ymax=1,ls="--",ms=0.1)
+        plt.axvline(x=6562.808+0.6/2,ymin=0,ymax=1,ls="--",ms=0.1)
+        #reference lines bandpass HaR1 and HaR2
+        plt.axvline(x=6550.870-10.75/2,ymin=0,ymax=1,ls="--",ms=0.1)
+        plt.axvline(x=6550.870+10.75/2,ymin=0,ymax=1,ls="--",ms=0.1)
+        plt.axvline(x=6580.310-8.75/2,ymin=0,ymax=1,ls="--",ms=0.1)
+        plt.axvline(x=6580.310+8.75/2,ymin=0,ymax=1,ls="--",ms=0.1)
+
+        indice_act = actin_manual_Ha06(wv, flux)
+        print(f"I_Halpha {list_labels[i]}: {indice_act}")        
+
+    plt.title(f"{star}, Ha")
     plt.tight_layout()
-    #plt.show()
-    plt.savefig(f"uves_tests_fig/{star}.pdf",overwrite=True, format = 'pdf', dpi=300)
+    plt.show()
+    #plt.savefig(f"uves_tests_fig/{star}_Ha_overlapped.pdf",overwrite=True, format = 'pdf', dpi=300)
 
 '''
 HD1461: 1 outlier com RV perto de 0. o BJD é muito menor que os outros (8/2005)
