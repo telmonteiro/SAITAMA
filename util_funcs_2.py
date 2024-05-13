@@ -9,6 +9,9 @@ from astropy.io import fits
 from astropy.table import Table
 from PyAstronomy import pyasl # type: ignore
 from PyAstronomy.pyTiming import pyPeriod # type: ignore
+from astropy.timeseries import LombScargle
+from scipy.signal import find_peaks
+from scipy.optimize import curve_fit
 
 from util_funcs_1 import _get_simbad_data
 
@@ -268,7 +271,7 @@ def correct_spec_rv(wv, rv, units):
 
 ########################
 
-def plot_line(data, line, line_color, line_legend="", lstyle = "-", normalize=True, legend_plot = False, plot_continuum_vlines = True, plot_lines_vlines = True):
+def plot_line(data, line, line_color,offset, line_legend="", lstyle = "-", normalize=True, legend_plot = False, plot_continuum_vlines = True, plot_lines_vlines = True):
     '''
     Plots the spectra used in the position of a reference line to check if everything is alright.
     '''
@@ -293,7 +296,7 @@ def plot_line(data, line, line_color, line_legend="", lstyle = "-", normalize=Tr
         if normalize == True:
             flux_normalized = (flux-np.min(flux))/(np.max(flux)-np.min(flux))
         else: flux_normalized = flux
-        plt.plot(wv, flux_normalized, lstyle, label=line_legend, color=line_color)
+        plt.plot(wv, flux_normalized+offset, lstyle, label=line_legend, color=line_color)
         if len(flux_normalized) < 40:
             lim = 4
         else: lim = 19
@@ -389,103 +392,234 @@ def flag_ratio_RV_corr(files,instr):
 
 #################################
 
-def are_harmonics(period1, period2, tolerance=0.1):
+def FWHM_power_peak(power,period):
+    '''Computes the FWHM of the power peak. Finds the maximum power and then the points to the left and right with power lower
+    than half the maximum. Used to compute the standard deviation of the period.'''
+    max_power_index = np.argmax(power)
+    max_power = power[max_power_index]
+    # Determine the half-maximum power level
+    half_max_power = max_power / 2
+    # Find the left and right boundaries at half-maximum power
+    try:
+        right_boundary_index = np.where(power[:max_power_index] < half_max_power)[0][-1]
+        right_boundary_period = period[right_boundary_index]
+        left_boundary_index = np.where(power[max_power_index:] < half_max_power)[0][0] + max_power_index
+        left_boundary_period = period[left_boundary_index]
+        fwhm = right_boundary_period - left_boundary_period
+    except: 
+        right_boundary_period = 0
+        left_boundary_period = 0
+        fwhm=0
+    return fwhm, left_boundary_period, right_boundary_period, half_max_power
+
+def are_harmonics(period1, period2, tolerance=0.01):
+    '''Check if the two periods given are harmonic.'''
     ratio = period1 / period2
     # Check if the ratio is close to an integer or simple fraction
     if abs(ratio - round(ratio)) < tolerance:
         return True
     else:
         return False
+    
+def get_harmonic_list(period):
+    '''Compute the existence or not of harmonics in the given period list.'''
+    harmonics_list = []
+    for i in range(len(period)):
+        for j in range(i+1, len(period)):
+            if are_harmonics(period[j], period[i], tolerance=0.01):
+                print(f"Period {period[i]} and {period[j]} are harmonics of each other")
+                harmonics_list.append([period[i], period[j]])
+    return harmonics_list
 
-def periodogram_flagging(harmonics_list, period, period_err, power_list, plevels):
+def periodogram_flagging(harmonics_list, period, period_err, power_list, plevels, t_span):
     '''
-    Green/4: error < 10% and no harmonics in 3 periods with most power
-    Yellow/3: 10% < error < 20% and no harmonics in 3 periods with most power
-    Orange/2: harmonics in 3 periods with most power or no error
-    Red/1: many periods with power close to each under: if number of periods over 80% of the max > 3
-    Black/0: discarded, error > 20%, period under 1 yr or over 100 yrs, below FAP 1% level
+    Green/4: error < 20% and no harmonics in significant peaks
+    Yellow/3: 30% > error > 20% and no harmonics in significant peaks
+    Orange/2: harmonics in significant peaks, no error or error > 30%
+    Red/1: many periods with power close to each under: if number of periods over 85% of the max > 0
+           or if the period obtained is bigger than the time span
+    Black/0: discarded - period under 1 yr or over 100 yrs, below FAP 1% level
     '''
     error = period_err/period * 100
-    powers_close_max = [n for n in power_list if n > 0.8*np.max(power_list)]
+    powers_close_max = [n for n in power_list if n > 0.85*np.max(power_list)]
 
-    if error > 20 or np.max(power_list) < plevels[-1] or period < 365 or period > 100*365:
+    if np.max(power_list) < plevels[-1] or period < 365 or period > 100*365:
         flag = "black"
     else:
-        if error <= 10 and len(harmonics_list) == 0:
+        if 0 < error <= 20 and len(harmonics_list) == 0 and period < t_span and len(powers_close_max) == 0:
             flag = "green"
-        elif 10 < error <= 20 and len(harmonics_list) == 0:
+        elif 20 < error <= 30 and len(harmonics_list) == 0 and period < t_span:
             flag = "yellow"
-        elif len(harmonics_list) > 0 or period_err == 0.0:
+        elif (len(harmonics_list) > 0 or period_err == 0.0 or error > 30) and period < t_span:
             flag = "orange"
-        elif len(powers_close_max) > 3:
+        elif len(powers_close_max) > 0 or period > t_span:
             flag = "red"
 
     return flag
-        
-def gls_periodogram(star, I_CaII, I_CaII_err, bjd, print_info, mode, save, path_save):
-    # Compute the GLS periodogram with default options. Choose Zechmeister-Kuerster normalization explicitly
-    clp = pyPeriod.Gls((bjd - 2450000, I_CaII, I_CaII_err), norm="ZK", verbose=print_info,ofac=30)
-    dic_clp = clp.info(noprint=True)
-    period = dic_clp["best_sine_period"]
-    period_err = dic_clp["best_sine_period_err"]
-    # Define FAP levels of 10%, 5%, and 1%
-    fapLevels = np.array([0.1, 0.05, 0.01])
-    # Obtain the associated power thresholds
-    plevels = clp.powerLevel(fapLevels)
 
-    plt.figure(1, figsize=(13, 4))
-    plt.suptitle(f"GLS periodogram for {star} I_CaII", fontsize=12)
+def gaps_time(BJD):
+    '''Takes the BJD array and returns the 10 biggest gaps in time.'''
+    time_sorted = BJD[np.argsort(BJD)] #sorting time
+    gaps = np.diff(time_sorted)
+    gaps = gaps[np.argsort(gaps)][-10:]
+    return gaps
 
-    # and plot power vs. frequency.
-    plt.subplot(1, 2, 1)
-    if mode == "Period":
-        plt.xlabel("Period [days]")
-        period_list = 1/clp.freq
+def get_sign_gls_peaks(df_peaks, df_peaks_WF, gaps, fap1, atol_frac=0.1, verb=False, evaluate_gaps=False):
+    """Get GLS significant peaks and excludes peaks close to window function peaks and to gaps in BJD."""
+    sign_peaks = [per for per, power in zip(df_peaks['peaks_period'], df_peaks['peaks_power']) if power > fap1]
+    sign_peaks_win = [per for per, power in zip(df_peaks_WF['peaks_period_win'], df_peaks_WF['peaks_power_win']) if power > fap1]
 
-        array_descending = np.argsort(clp.power)[-3:]
-        top_3_period = period_list[array_descending]
-        harmonics_list = []
-        for i in range(len(top_3_period)):
-            for j in range(i+1, len(top_3_period)):
-                if are_harmonics(top_3_period[j], top_3_period[i], tolerance=0.01):
-                    #print(f"Period {top_3_period[i]} and {top_3_period[j]} are harmonics of each other")
-                    harmonics_list.append([top_3_period[i], top_3_period[j]])
-       
-        flag = periodogram_flagging(harmonics_list, period, period_err, clp.power, plevels)
-        print("Flag: ",flag)
-        
-        plt.plot(period_list, clp.power, 'b-')
-        plt.xlim([0, period+2000])
+    # exclude peaks close to win peaks
+    exc_peaks = []
+    for peak in sign_peaks:
+        atol = peak * 0.1
+        for peak_win in sign_peaks_win:
+            if np.isclose(peak, peak_win, atol=atol):
+                exc_peaks.append(peak)
+                if verb:
+                    print(f"{peak:.2f} is close to win peak {peak_win:.2f} for the tolerance {atol:.2f} ({int(atol_frac*100)} %)")
+        if evaluate_gaps == True:
+            for gap in gaps:
+                if np.isclose(peak,gap, atol=atol):
+                    exc_peaks.append(peak)
+                    if verb:
+                        print(f"{peak:.2f} is close to gap {gap:.2f} for the tolerance {atol:.2f} ({int(atol_frac*100)} %)")               
 
-    elif mode == "Frequency":
-        plt.xlabel("Frequency [1/days]")
-        freq_list = clp.freq
-        plt.plot(freq_list, clp.power, 'b-')
+    sel_peaks = [peak for peak in sign_peaks if peak not in exc_peaks]
 
-    plt.ylabel("Power")
-    plt.title(f"Power vs {mode} for GLS Periodogram")
+    return np.sort(sel_peaks)
+
+#* GLS periodogram (Astropy):
+def gls(star, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5):
+    """Generalised Lomb-Scargle Periodogram using the `astropy` implementation.
+
+    Args:
+        x (array-like): Time coordinate.
+        y (array-like): Y-coordinate.
+        y_err (array-like, None): Y error if not None.
+        pmin (float): Minimum period to compute periodogram.
+        pmax (float): Maximum period to compute periodogram.
+        steps (int): Step of frequency grid.
+
+    Returns:
+        (dictionary): Dictionary with following keys:
+            period (ndarray): Period grid of periodogram.
+            power (ndarray): GLS power at each period grid point.
+            peaks_power (ndarray): GLS power at the peaks.
+            peaks_period (ndarray): Period at the peaks.
+
+            fap_maxp (float): FAP for period at maximum GLS power (highest peak).
+            fap_5 (float): GLS power for 5% FAP level.
+            fap_1 (float): GLS power for 1% FAP level.
+            FAPS (ndarray): List of FAPs in the same order as periods and power
+
+            power_win (ndarray): GLS power of window function at each period grid point.
+
+    Ref: Zechmeister & Kürster (2009)
+    """
+    x = np.asarray(x); y = np.asarray(y)
+    t = max(x) - min(x); n = len(x)
+
+    #Nyquist frequencies computation
+    k1 = pmax/t; fmin = 1./(k1 * t)
+    k2 = pmin * n/t; fmax = n/(k2 * t)
+
+    freq = np.linspace(fmin, fmax, int(steps))
+    period = 1./freq
+
+    gls = LombScargle(x, y, y_err)
+    power = gls.power(freq)
+
+    peaks, _ = find_peaks(power)
+    #print("Peaks",peaks)
+    sorted_peak_indices = np.argsort(power[peaks])[::-1]  # Sort in descending order of power
+    sorted_peaks = peaks[sorted_peak_indices]
+    peaks_power = power[sorted_peaks]
+    peaks_period = period[sorted_peaks]
     
-    # Add the FAP levels to the plot
-    for i in range(len(fapLevels)):
-        plt.plot([min(period_list), max(period_list)], [plevels[i]]*2, '--',
-                label="FAP = %4.1f%%" % (fapLevels[i]*100))
+    fap_max_power = gls.false_alarm_probability(np.nanmax(power))
+    faps = gls.false_alarm_probability(power)
+    fap_levels = np.array([0.05, 0.01])
+    fap5, fap1 = gls.false_alarm_level(fap_levels)
+
+    #* Window function:
+    y_win = np.ones_like(y)
+    power_win = LombScargle(x, y_win, fit_mean=False, center_data=False).power(freq)
+    
+    results = dict()
+    results['freq'] = freq; results['period'] = period
+    results['power'] = power
+    results['fap_maxp'] = fap_max_power
+    results['fap_1'] = fap1; results['fap_5'] = fap5
+    results['FAPS'] = faps
+    # window function:
+    results['power_win'] = power_win
+
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(13, 4))
+    fig.suptitle(f"GLS Astropy periodogram for {star} I_CaII", fontsize=12)
+    axes[0].set_xlabel("Period [days]"); axes[0].set_ylabel("Power")
+    axes[0].plot(period, power, 'b-')
+    axes[0].set_title(f"Power vs Period for GLS Periodogram")
+    plevels = [fap5,fap1]
+    for i in range(len(fap_levels)): # Add the FAP levels to the plot
+        axes[0].plot([min(period), max(period)], [plevels[i]]*2, '--',
+                label="FAP = %4.1f%%" % (fap_levels[i]*100))
+    axes[0].legend()
+    
+    fwhm, left_boundary_period, right_boundary_period, half_max_power = FWHM_power_peak(power,period)
+    results["FWHM_period_best"] = fwhm
+    results["std_period_best"] = fwhm / (2*np.sqrt(2*np.log(2)))
+
+    period_max = peaks_period[0]
+    results["period_best"] = period_max
+
+    def sin_model(x, a, phi, omega):
+        return a * np.sin(2 * np.pi * x/period_max + phi) + omega
+    x_grid = np.arange(min(x), max(x), 0.01)
+    p1, _ = curve_fit(sin_model, x, y)
+    y_grid = sin_model(x_grid, *p1)
+    axes[1].plot(x_grid, y_grid, 'b-')
+    axes[1].errorbar(x,y,yerr=y_err,fmt='.', color='k',label='data')
+    axes[1].set_xlabel('BJD $-$ 2450000 [days]'); axes[1].set_ylabel(r'$S_\mathrm{CaII}$')
+    axes[1].set_title("Fitting the data with GLS")
+    axes[1].legend()
+
+    plt.figure(4, figsize=(7, 4))
+    plt.xlabel("Period [days]"); plt.ylabel("Power")
+    period_list_WF = period
+    period_max_WF = period[np.argmax(power_win)]
+    results["period_best_WF"] = period_max_WF
+    plt.plot(period_list_WF, power_win, 'b-')
+    plt.title(f"Power vs Period for Astropy GLS Periodogram {star} Window Function")
+    for i in range(len(fap_levels)): # Add the FAP levels to the plot
+        plt.plot([min(period_list_WF), max(period_list_WF)], [plevels[i]]*2, '--',
+                label="FAP = %4.1f%%" % (fap_levels[i]*100))
     plt.legend()
 
-    plt.subplot(1, 2, 2)
-    timefit = np.linspace(min(bjd - 2450000),max(bjd - 2450000),1000)
-    plt.plot(timefit,clp.sinmod(timefit),label="fit")
-    plt.errorbar(bjd - 2450000,I_CaII,yerr=I_CaII_err,fmt='.', color='k',label='data')
-    plt.xlabel('BJD $-$ 2450000 [days]'); plt.ylabel(r'$S_\mathrm{CaII}$')
-    plt.title("Fitting the data with GLS")
-    plt.legend()
+    peaks_WF, _ = find_peaks(power_win)
+    sorted_peak_indices = np.argsort(power_win[peaks_WF])[::-1]  # Sort in descending order of power
+    sorted_peaks = peaks_WF[sorted_peak_indices]
+    peaks_power_win = power_win[sorted_peaks]
+    peaks_period_win = period_list_WF[sorted_peaks]
 
-    plt.subplots_adjust(top=0.85)
-    if save == True:
-        plt.savefig(path_save, bbox_inches="tight")
+    df_peaks = pd.DataFrame({"peaks_period":peaks_period,"peaks_power":peaks_power})
+    df_peaks_WF = pd.DataFrame({"peaks_period_win":peaks_period_win,"peaks_power_win":peaks_power_win})
+    gaps = gaps_time(x)
+    print("Gaps in BJD:", gaps)
+    sel_peaks = get_sign_gls_peaks(df_peaks, df_peaks_WF, gaps, fap1, atol_frac=0.1, verb=False, evaluate_gaps=False)
+    print("Significant Peaks:",sel_peaks)
+    for peak in sel_peaks:
+        axes[0].axvline(peak, ls='--', lw=0.7, color='orange')
 
-    return round(period,3), round(period_err,3), flag
+    harmonics_list = get_harmonic_list(sel_peaks)
+    period_err = results["std_period_best"]
+    flag = periodogram_flagging(harmonics_list, period_max, period_err, power, plevels, t_span=t)
+    print("Flag: ",flag)
 
-def get_report_periodogram(hdr,gaps,period,period_err,flag_period,harmonics_list,period_WF,period_err_WF,folder_path):
+    return results, gaps, flag, period_max, period_err, harmonics_list
+
+def get_report_periodogram(hdr,gaps,period,period_err,flag_period,harmonics_list,folder_path):
+    '''Writes into a txt file a tiny report on the periodogram.'''
     instr = hdr["INSTR"]; star = hdr["STAR_ID"]
     t_span = hdr["TIME_SPAN"]
     snr_min = hdr["SNR_MIN"]; snr_max = hdr["SNR_MAX"]
@@ -509,7 +643,6 @@ def get_report_periodogram(hdr,gaps,period,period_err,flag_period,harmonics_list
         f.write(f"Period flag: {flag_period}\n")
         f.write(f"Harmonics: {harmonics_list}\n")
         f.write(f"Time gaps between data points: {gaps}\n")
-        f.write(f"Window Function Period: {period_WF} +/- {period_err_WF} days\n")
         f.write("\n")
         f.write("###"*30+"\n")
     

@@ -63,7 +63,7 @@ from util_funcs_2 import (
     read_fits,plot_line,
     get_rv_ccf,correct_spec_rv,flag_ratio_RV_corr,
     stats_indice,plot_RV_indices,
-    sigma_clip,gls_periodogram,
+    sigma_clip,gls,get_report_periodogram,
     general_fits_file)
 
 from actin2 import ACTIN # type: ignore
@@ -250,8 +250,8 @@ def pipeline(stars, instruments,
                 os.mkdir(folder_path)
                 os.mkdir(folder_path + "ADP/")
 
-            data_array = []  # to plot the lines later
-            drv = 0.1  # step to search rv
+            data_array = []  # to plot th+e lines later
+            drv = 0.2  # step to search rv
 
             for file in files_tqdm:
                 time.sleep(0.01)
@@ -338,13 +338,10 @@ def pipeline(stars, instruments,
 
                 if n_spec >= 30 and t_span >= 2 * 365:
                     # only compute periodogram if star has at least 30 spectra in a time span of at least 2 years
-                    period, period_err, flag_period = gls_periodogram(
-                        target_save_name,
-                        I_CaII_extracted, I_CaII_err_extracted,
-                        bjd_extracted,
-                        print_info=False,
-                        mode="Period",
-                        save=True, path_save=folder_path + f"{target_save_name}_GLS.pdf")
+                    results, gaps, flag_period, period, period_err, harmonics_list = gls(target_save_name, df["bjd"]-2450000, df["I_CaII"], y_err=df["I_CaII_err"], 
+                                                                                             pmin=1.5, pmax=1e4, steps=1e5)
+                    report_periodogram = get_report_periodogram(hdr,gaps,period,period_err,flag_period,harmonics_list,folder_path=folder_path)
+                    print(report_periodogram)
                     plt.clf()
                     print(f"Period of I_CaII: {period} +/- {period_err} days")
                     print(f"Flag of periodogram: {flag_period}")
