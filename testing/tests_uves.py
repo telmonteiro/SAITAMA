@@ -1,5 +1,5 @@
 import pandas as pd, numpy as np, matplotlib.pyplot as plt, os, glob
-from util_funcs_2 import read_bintable, plot_line, read_fits
+from general_funcs import read_bintable, plot_line, read_fits
 from astropy.io import fits
 
 def actin_manual_Ha06(wv, flux):
@@ -79,7 +79,7 @@ stars_dic = {
 }
 
 stars = stars_dic.keys()
-stars = ["HD102365"]
+stars = ["HD16417"]
 for star in stars:
     file_uves = glob.glob(os.path.join(f"teste_download_rv_corr/{star}/{star}_UVES/", f"df_stats_{star}.fits"))
     if file_uves == []:
@@ -134,7 +134,7 @@ for star in stars:
     ax5 = plt.subplot2grid((2, 3), (1, 2))
     fig.suptitle(star, fontsize=14)
 
-    #print(df_uves[["RV_flag","I_Ha06","file","rv","spec_res"]])
+    print(df_uves[["RV_flag","I_Ha06","file","rv","spec_res"]])
 
     ax1.scatter(df_uves.loc[~mask, 'bjd'] - 2450000, df_uves.loc[~mask, 'SNR'], label=f'I_Ha06 >= {outlier_up}')
     ax1.scatter(df_uves.loc[mask, 'bjd'] - 2450000, df_uves.loc[mask, 'SNR'], color='red', label=f'I_Ha06 < {outlier_down}')
@@ -180,13 +180,13 @@ for star in stars:
     labels_HD1461 = [f"Outlier, Res: {outlier_point['spec_res'].values[0]}, BJD: {round(outlier_point['bjd'].values[0]) - 2450000}", 
               f"Non-outlier, Res: {non_outlier_high_res['spec_res'].values[0]}, BJD: {round(non_outlier_high_res['bjd'].values[0]) - 2450000}", 
               f"HARPS, Res: {harps_point['spec_res'].values[0]}, BJD: {round(harps_point['bjd'].values[0]) - 2450000}"]
-    offset = [0,0,0]
+    offset = [0,0.2,-0.2]
     color_list = ["red","blue","black"]
     for i,spec in enumerate(list_points):
         if i == len(list_points): instr = "HARPS"
         file = spec["file"].values[0].replace('teste_download', 'teste_download_rv_corr')
         wv, flux, flux_err, hdr = read_fits(file,instrument=instr,mode="rv_corrected")
-        plot_line(data=[(wv+offset[i],flux)], line="Ha", normalize=False, line_color=color_list[i], line_legend=labels_HD1461[i], legend_plot = True, 
+        plot_line(data=[(wv,flux)], line="Ha", offset=offset[i], normalize=True, line_color=color_list[i], line_legend=labels_HD1461[i], legend_plot = True, 
                   plot_continuum_vlines = False, plot_lines_vlines = False)
         #activity line bandpass
         plt.axvline(x=6562.808-0.6/2,ymin=0,ymax=1,ls="--",ms=0.1)

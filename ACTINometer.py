@@ -53,18 +53,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import tqdm
-import time
 
 from astroquery.eso import Eso # type: ignore
 from astropy.io import fits
-from astroquery.simbad import Simbad # type: ignore
-from util_funcs_1 import (get_gaiadr3,choose_snr,check_downloaded_data,select_best_spectra)
-from util_funcs_2 import (
-    read_fits,plot_line,
-    get_rv_ccf,correct_spec_rv,flag_ratio_RV_corr,
-    stats_indice,plot_RV_indices,
-    sigma_clip,gls,get_report_periodogram,
-    general_fits_file)
+from get_spec_funcs import (get_gaiadr3, choose_snr, check_downloaded_data, select_best_spectra)
+from general_funcs import (read_fits, plot_line, stats_indice, plot_RV_indices, sigma_clip, general_fits_file)
+from RV_correction_funcs import (get_rv_ccf,correct_spec_rv,flag_ratio_RV_corr)
+from periodogram_funcs import (gls,get_report_periodogram)
 
 from actin2 import ACTIN # type: ignore
 
@@ -74,16 +69,7 @@ actin = ACTIN()
 global logger
 eso = Eso()
 
-def get_adp_spec(
-    eso,
-    search_name,name_target,
-    neglect_data,
-    instrument="HARPS",
-    min_snr=10,max_snr=550,
-    box=0.07,
-    path_download_base="tmpdir_download4/",
-    max_spectra=250,
-):
+def get_adp_spec(eso, search_name,name_target, neglect_data, instrument="HARPS", min_snr=10,max_snr=550, box=0.07, path_download_base="tmpdir_download4/", max_spectra=250):
     """
     Downloads and processes spectra from ESO database.
 
@@ -165,10 +151,7 @@ def get_adp_spec(
     return paths_download
 
 
-def pipeline(stars, instruments, 
-             columns_df, indices, 
-             max_spectra, min_snr,
-             download, neglect_data, username_eso):
+def pipeline(stars, instruments, columns_df, indices, max_spectra, min_snr,download, neglect_data, username_eso):
 
     max_snr_instr = {"HARPS": 550,"ESPRESSO": 1000,"FEROS": 1000,"UVES": 550}  # max SNR to be used to avoid saturation
 
@@ -215,22 +198,14 @@ def pipeline(stars, instruments,
                 logger.setLevel(logging.INFO)
                 fh = logging.FileHandler("test.log", mode="w")
                 fh.setLevel(logging.INFO)
-                formatter = logging.Formatter(
-                    "%(asctime)s : %(message)s", datefmt="%m/%d/%Y %I:%M:%S %p"
-                )
+                formatter = logging.Formatter("%(asctime)s : %(message)s", datefmt="%m/%d/%Y %I:%M:%S %p")
                 fh.setFormatter(formatter)
                 logger.addHandler(fh)
                 logger.info("Started")
                 fh.close()
 
-                path_downloads = get_adp_spec(
-                    eso,
-                    target_search_name,target_save_name,
-                    neglect_data,
-                    min_snr=min_snr,max_snr=max_snr,
-                    instrument=instr,
-                    path_download_base=star_folder,
-                    max_spectra=max_spectra)
+                path_downloads = get_adp_spec(eso, target_search_name,target_save_name, neglect_data,
+                    min_snr=min_snr,max_snr=max_snr, instrument=instr, path_download_base=star_folder, max_spectra=max_spectra)
 
                 if path_downloads == None:
                     pass  # skip to next instrument if there are no observations with the present one
@@ -240,9 +215,8 @@ def pipeline(stars, instruments,
             if len(files) == 0:
                 continue
             files_tqdm = tqdm.tqdm(files) #to make a progress bar
-            sun_template_wv, sun_template_flux, sun_template_flux_err, sun_header = read_fits(
-                file_name="Sun1000.fits", instrument=None, mode=None
-            )  # template spectrum for RV correction
+            # template spectrum for RV correction
+            sun_template_wv, sun_template_flux, sun_template_flux_err, sun_header = read_fits(file_name="Sun1000.fits", instrument=None, mode=None)
 
             # creates folders to save the rv corrected fits files
             folder_path = (f"teste_download_rv_corr/{target_save_name}/{target_save_name}_{instr}/")
@@ -251,10 +225,9 @@ def pipeline(stars, instruments,
                 os.mkdir(folder_path + "ADP/")
 
             data_array = []  # to plot th+e lines later
-            drv = 0.2  # step to search rv
+            drv = 0.5  # step to search rv
 
             for file in files_tqdm:
-                time.sleep(0.01)
 
                 wv, f, f_err, hdr = read_fits(file, instr, mode="raw")
                 # value = negative_flux_treatment(f, method="skip") #method can be "zero_pad"
@@ -264,7 +237,7 @@ def pipeline(stars, instruments,
                     stellar_wv = wv, stellar_flux = f, stellar_header = hdr,
                     template_hdr = sun_header, template_spec=sun_template_flux,
                     drv = drv, units = "m/s",
-                    instrument = instr)
+                    instrument = instr, quick_RV = True)
                 #radial_velocity is the RV value, rv is the array of radial velocities given by the CCF
                 wv_corr, mean_delta_wv = correct_spec_rv(w, radial_velocity, units="m/s")
 
@@ -332,13 +305,13 @@ def pipeline(stars, instruments,
                 bjd_extracted = df.loc[ind_I_CaII_Rneg, "bjd"]
                 try:
                     t_span = max(bjd_extracted) - min(bjd_extracted)
-                    n_spec = len(I_CaII_err_extracted)
+                    n_spec = len(bjd_extracted)
                 except:
                     n_spec = 0
 
                 if n_spec >= 30 and t_span >= 2 * 365:
                     # only compute periodogram if star has at least 30 spectra in a time span of at least 2 years
-                    results, gaps, flag_period, period, period_err, harmonics_list = gls(target_save_name, df["bjd"]-2450000, df["I_CaII"], y_err=df["I_CaII_err"], 
+                    results, gaps, flag_period, period, period_err, harmonics_list = gls(target_save_name, bjd_extracted-2450000, I_CaII_extracted, y_err=I_CaII_err_extracted, 
                                                                                              pmin=1.5, pmax=1e4, steps=1e5)
                     report_periodogram = get_report_periodogram(hdr,gaps,period,period_err,flag_period,harmonics_list,folder_path=folder_path)
                     print(report_periodogram)
@@ -355,16 +328,9 @@ def pipeline(stars, instruments,
                 stats_df.to_csv(folder_path + f"stats_{target_save_name}.csv")
 
                 file_path = folder_path + f"df_stats_{target_save_name}.fits" #save into the final fits file
-                general_fits_file(
-                    stats_df, df,
-                    file_path,
-                    min_snr, max_snr,
-                    instr,
-                    period, period_err, flag_period,
-                    flag_rv_ratio)
+                general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_period, flag_rv_ratio)
 
                 # shutil.rmtree(f"teste_download/{target_save_name}/")  # remove original fits files
-
 
 ### Main program:
 def main(stars, instruments, columns_df, indices, max_spectra, min_snr, download, neglect_data, username_eso):
@@ -377,8 +343,7 @@ if __name__ == "__main__":
         "HD108147","HD16141","HD179949","HD47536","HD20794","HD85512","HD192310"]
     #stars = ["HD47536"]
     instruments = ["UVES"]
-    columns_df = [
-        "I_CaII","I_CaII_err","I_CaII_Rneg",
+    columns_df = ["I_CaII","I_CaII_err","I_CaII_Rneg",
         "I_Ha06","I_Ha06_err","I_Ha06_Rneg",
         "I_NaI","I_NaI_err","I_NaI_Rneg",
         "bjd","file","instr","rv","obj","SNR"]  # for df
