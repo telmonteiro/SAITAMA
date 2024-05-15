@@ -6,7 +6,7 @@ from PyAstronomy import pyasl # type: ignore
 from general_funcs import (calc_fits_wv_1d, read_fits)
 from get_spec_funcs import (_get_simbad_data)
 
-def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, template_spec, drv, units, instrument):
+def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, template_spec, drv, units, instrument, quick_RV):
     '''
     Uses crosscorrRV function from PyAstronomy to get the CCF of the star comparing with a spectrum of the Sun.
     Returns the BJD in days, the RV, the max value of the CCF, the list of possible RV and CC, as well as the flux and raw wavelength.
@@ -26,28 +26,35 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
     w_cut = w[w_ind_common]
     f_cut = f[w_ind_common]
 
+    #only uses two 250 Angstrom intervals, that change according to the instrument
+    if quick_RV == True: 
+        if instrument == "UVES": #doesn't include CaII H&K lines
+            w_ind_tiny = np.where((6400 < w) & (w < 6700) | (5500 > w) & (w > 5250)) #Halpha region and leftmost side of spectrum
+        else: #HARPS or ESPRESSO
+            w_ind_tiny = np.where((6400 < w) & (w < 6700) | (5250 > w) & (w > 4900)) #Halpha region and CaII H&K region
+        w_cut = w_cut[w_ind_tiny]
+        f_cut = f_cut[w_ind_tiny]   
+
     try:
         rv_simbad = _get_simbad_data(star=star, alerts=False)["RV_VALUE"] #just to minimize the computational cost
         if instrument == "HARPS":
-            rvmin = rv_simbad - 10; rvmax = rv_simbad + 10
+            rvmin = rv_simbad - 5; rvmax = rv_simbad + 5
         elif instrument == "UVES":
-            rvmin = rv_simbad - 100; rvmax = rv_simbad + 100
+            rvmin = rv_simbad - 80; rvmax = rv_simbad + 80
         elif instrument == "ESPRESSO":
-            rvmin = rv_simbad - 100; rvmax = rv_simbad + 100
+            rvmin = rv_simbad - 80; rvmax = rv_simbad + 80
     except:
         rvmin = -150; rvmax = 150
 
     #get the cross-correlation
-    skipedge_values = [0, 100, 500, 1000, 5000, 20000, 50000]
+    skipedge_values = [0, 100, 500, 1000, 5000, 20000]
 
     for skipedge in skipedge_values:
         try:
-            rv, cc = pyasl.crosscorrRV(w=w_cut, f=f_cut, tw=tw,
-                                    tf=tf, rvmin=rvmin, rvmax=rvmax, drv=drv, skipedge=skipedge)
+            rv, cc = pyasl.crosscorrRV(w=w_cut, f=f_cut, tw=tw, tf=tf, rvmin=rvmin, rvmax=rvmax, drv=drv, skipedge=skipedge)
             break  # Break out of the loop if successful
         except Exception as e:
             #print(f"Error with skipedge={skipedge}: {e}")
-            #print(f"Error with skipedge={skipedge}")
             continue
             # Continue to the next iteration
 

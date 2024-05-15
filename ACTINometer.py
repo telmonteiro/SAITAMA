@@ -311,9 +311,11 @@ def pipeline(stars, instruments, columns_df, indices, max_spectra, min_snr,downl
 
                 if n_spec >= 30 and t_span >= 2 * 365:
                     # only compute periodogram if star has at least 30 spectra in a time span of at least 2 years
-                    results, gaps, flag_period, period, period_err, harmonics_list = gls(target_save_name, bjd_extracted-2450000, I_CaII_extracted, y_err=I_CaII_err_extracted, 
-                                                                                             pmin=1.5, pmax=1e4, steps=1e5)
-                    report_periodogram = get_report_periodogram(hdr,gaps,period,period_err,flag_period,harmonics_list,folder_path=folder_path)
+                    results, gaps, flag_period, period, period_err, harmonics_list = gls(target_save_name, instr, bjd_extracted-2450000, I_CaII_extracted, y_err=I_CaII_err_extracted, 
+                                                                                             pmin=1.5, pmax=1e4, steps=1e5, save=True, folder_path=folder_path)
+                    snr_min = np.min(df["SNR"]); snr_max = np.max(df["SNR"])
+                    dic = {"INSTR":instr,"STAR_ID":target_save_name,"TIME_SPAN":t_span,"SNR_MIN":snr_min,"SNR_MAX":snr_max,"I_CAII_N_SPECTRA":n_spec,"FLAG_RV":flag_rv_ratio}
+                    report_periodogram = get_report_periodogram(dic,gaps,period,period_err,flag_period,harmonics_list,folder_path=folder_path)
                     print(report_periodogram)
                     plt.clf()
                     print(f"Period of I_CaII: {period} +/- {period_err} days")
@@ -342,7 +344,7 @@ if __name__ == "__main__":
     stars = ["HD209100","HD160691","HD115617","HD46375","HD22049","HD102365","HD1461","HD16417","HD10647","HD13445","HD142A",
         "HD108147","HD16141","HD179949","HD47536","HD20794","HD85512","HD192310"]
     #stars = ["HD47536"]
-    instruments = ["UVES"]
+    instruments = ["HARPS","ESPRESSO","UVES"]
     columns_df = ["I_CaII","I_CaII_err","I_CaII_Rneg",
         "I_Ha06","I_Ha06_err","I_Ha06_Rneg",
         "I_NaI","I_NaI_err","I_NaI_Rneg",
@@ -352,7 +354,7 @@ if __name__ == "__main__":
     max_spectra = 150 # maximum spectra to be selected
     min_snr = 15 #minimum overall SNR
 
-    download = True #download from ESO database?
+    download = False #download from ESO database?
 
     username_eso = "telmonteiro"
 

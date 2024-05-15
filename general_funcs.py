@@ -216,7 +216,7 @@ def plot_line(data, line, line_color=None,offset=0, line_legend="", lstyle = "-"
         flux = flux[wv_array]
         #flux_normalized = flux/np.linalg.norm(flux)
         if normalize == True:
-            flux_normalized = (flux-np.min(flux))/(np.max(flux)-np.min(flux))
+            flux_normalized = flux/np.median(flux)#(flux-np.min(flux))/(np.max(flux)-np.min(flux))
         else: flux_normalized = flux
         plt.plot(wv, flux_normalized+offset, lstyle, label=line_legend, color=line_color)
         if len(flux_normalized) < 50:

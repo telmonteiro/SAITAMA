@@ -1,6 +1,9 @@
 import pandas as pd, numpy as np, matplotlib.pyplot as plt, os, glob
 from general_funcs import read_bintable, plot_line, read_fits
 from astropy.io import fits
+from actin2 import ACTIN # type: ignore
+
+actin = ACTIN()
 
 def actin_manual_Ha06(wv, flux):
     '''Manual rough estimate of I_Halpha by taking the reference and activity lines and computing the ratio between
@@ -79,8 +82,14 @@ stars_dic = {
 }
 
 stars = stars_dic.keys()
-stars = ["HD16417"]
+#stars = ["HD16141"]
+stars = ["HD209100","HD160691","HD115617","HD46375","HD22049","HD102365","HD1461","HD16417","HD10647","HD13445","HD142A",
+        "HD108147","HD16141","HD179949","HD47536","HD20794","HD85512","HD192310"] #HD85512 and HD46375 dont have UVES spectra
+#stars = ["HD192310"]
+instr = "UVES"
 for star in stars:
+    print(star)
+
     file_uves = glob.glob(os.path.join(f"teste_download_rv_corr/{star}/{star}_UVES/", f"df_stats_{star}.fits"))
     if file_uves == []:
         continue
@@ -124,7 +133,8 @@ for star in stars:
     ax4.scatter(df_harps['bjd'] - 2450000, df_harps['mean_airmass'], color='black', label='HARPS')
     ax4.set_xlabel("BJD $-$ 2450000 [days]"); ax4.set_ylabel("Mean Airmass"); ax4.legend()
     plt.tight_layout()
-    #plt.savefig(f"uves_tests_fig/{star}_meteorology.pdf",overwrite=True, format = 'pdf', dpi=300)
+    plt.savefig(f"uves_tests_fig/{star}_meteorology.pdf",overwrite=True, format = 'pdf', dpi=300)
+    plt.clf()
 
     fig = plt.figure(1,figsize=(16, 8), constrained_layout=True)
     ax1 = plt.subplot2grid((2, 3), (0, 0))
@@ -134,7 +144,7 @@ for star in stars:
     ax5 = plt.subplot2grid((2, 3), (1, 2))
     fig.suptitle(star, fontsize=14)
 
-    print(df_uves[["RV_flag","I_Ha06","file","rv","spec_res"]])
+    #print(df_uves[["RV_flag","I_Ha06","file","rv","spec_res"]])
 
     ax1.scatter(df_uves.loc[~mask, 'bjd'] - 2450000, df_uves.loc[~mask, 'SNR'], label=f'I_Ha06 >= {outlier_up}')
     ax1.scatter(df_uves.loc[mask, 'bjd'] - 2450000, df_uves.loc[mask, 'SNR'], color='red', label=f'I_Ha06 < {outlier_down}')
@@ -159,6 +169,9 @@ for star in stars:
     ax5.scatter(df_harps['bjd'] - 2450000, df_harps['spec_res'], color='black',label="HARPS")
     ax5.set_xlabel("BJD $-$ 2450000 [days]"); ax5.set_ylabel("Spectral Resolution"); ax5.legend()
 
+    plt.tight_layout()
+    plt.savefig(f"uves_tests_fig/{star}_plots.pdf",overwrite=True, format = 'pdf', dpi=300)
+    plt.clf()
     #outlier_point = df_uves.loc[mask, ['spec_res',"file","bjd"]].iloc[:1]
     #non_outlier_low_res = df_uves.loc[~mask, ['spec_res',"file","bjd"]].iloc[4:5]
     #non_outlier_high_res = df_uves.loc[~mask, ['spec_res',"file","bjd"]].iloc[:1]
@@ -167,26 +180,36 @@ for star in stars:
     outlier_point = df_uves.loc[mask, ['spec_res',"file","bjd"]].iloc[:1]
     non_outlier_high_res = df_uves.loc[~mask, ['spec_res',"file","bjd"]].iloc[:1]
     harps_point = df_harps[['spec_res',"file","bjd"]].iloc[:1]
+
     list_points = [outlier_point,non_outlier_high_res,harps_point]
     list_labels = ["outlier","non-outlier","HARPS"]
 
     plt.figure(3, figsize=(12,8))
-    instr = "UVES"
-    #labels_HD115617 = [f"Outlier, Res: {outlier_point['spec_res'].values[0]}", f"Non-outlier, Res: {non_outlier_low_res['spec_res'].values[0]}", 
-    #          f"Non-outlier, Res: {non_outlier_high_res['spec_res'].values[0]}", f"HARPS, Res: {harps_point['spec_res'].values[0]}"]
-    #labels_HD16141 = [f"Outlier, Res: {outlier_point['spec_res'].values[0]}, BJD: {round(outlier_point['bjd'].values[0]) - 2450000}", 
-    #          f"Non-outlier, Res: {non_outlier_high_res['spec_res'].values[0]}, BJD: {round(non_outlier_high_res['bjd'].values[0]) - 2450000}", 
-    #          f"HARPS, Res: {harps_point['spec_res'].values[0]}, BJD: {round(harps_point['bjd'].values[0]) - 2450000}"]
-    labels_HD1461 = [f"Outlier, Res: {outlier_point['spec_res'].values[0]}, BJD: {round(outlier_point['bjd'].values[0]) - 2450000}", 
-              f"Non-outlier, Res: {non_outlier_high_res['spec_res'].values[0]}, BJD: {round(non_outlier_high_res['bjd'].values[0]) - 2450000}", 
-              f"HARPS, Res: {harps_point['spec_res'].values[0]}, BJD: {round(harps_point['bjd'].values[0]) - 2450000}"]
+
+    try:
+        outlier_spec_res = outlier_point['spec_res'].values[0]
+        outlier_bjd = round(outlier_point['bjd'].values[0]) - 2450000
+    except: outlier_spec_res = None; outlier_bjd = None
+    try:
+        nonoutlier_spec_res = non_outlier_high_res['spec_res'].values[0]
+        nonoutlier_bjd = round(non_outlier_high_res['bjd'].values[0]) - 2450000
+    except: nonoutlier_spec_res = None; nonoutlier_bjd = None
+
+    labels_star = [f"Outlier, Res: {outlier_spec_res}, BJD: {outlier_bjd}",
+                   f"Non-outlier, Res: {nonoutlier_spec_res}, BJD: {nonoutlier_bjd}",
+                   f"HARPS, Res: {harps_point['spec_res'].values[0]}, BJD: {round(harps_point['bjd'].values[0]) - 2450000}"]
+
+    
     offset = [0,0.2,-0.2]
     color_list = ["red","blue","black"]
     for i,spec in enumerate(list_points):
         if i == len(list_points): instr = "HARPS"
-        file = spec["file"].values[0].replace('teste_download', 'teste_download_rv_corr')
+        try:
+            file = spec["file"].values[0].replace('teste_download', 'teste_download_rv_corr')
+        except:
+            continue
         wv, flux, flux_err, hdr = read_fits(file,instrument=instr,mode="rv_corrected")
-        plot_line(data=[(wv,flux)], line="Ha", offset=offset[i], normalize=True, line_color=color_list[i], line_legend=labels_HD1461[i], legend_plot = True, 
+        plot_line(data=[(wv,flux)], line="Ha", offset=offset[i], normalize=True, line_color=color_list[i], line_legend=labels_star[i], legend_plot = True, 
                   plot_continuum_vlines = False, plot_lines_vlines = False)
         #activity line bandpass
         plt.axvline(x=6562.808-0.6/2,ymin=0,ymax=1,ls="--",ms=0.1)
@@ -202,8 +225,50 @@ for star in stars:
 
     plt.title(f"{star}, Ha")
     plt.tight_layout()
-    plt.show()
-    #plt.savefig(f"uves_tests_fig/{star}_Ha_overlapped.pdf",overwrite=True, format = 'pdf', dpi=300)
+    plt.savefig(f"uves_tests_fig/{star}_Ha_displaced.pdf",overwrite=True, format = 'pdf', dpi=300)
+    plt.clf()
+
+    files_uves = df_uves["file"]
+    flux_R1_R2 = np.zeros((len(files_uves))); flux_R1_R2_err = np.zeros((len(files_uves)))
+    I_Ha06 = np.zeros((len(files_uves))); I_Ha06_err = np.zeros((len(files_uves)))
+    for i,file in enumerate(files_uves):
+        wv, f, f_err, hdr = read_fits(file.replace("teste_download", "teste_download_rv_corr"),instr,mode="rv_corrected")
+
+        headers = {"file": file,"instr": instr}
+        spectrum = dict(wave=wv, flux=f, flux_err=f_err)
+        df_ind = actin.CalcIndices(spectrum, headers, ["I_Ha06"],full_output=True).indices
+
+        flux_R1_R2[i] = df_ind["HaR1_F"]/df_ind["HaR2_F"]
+        flux_R1_R2_err[i] = flux_R1_R2[i] * np.sqrt((df_ind["HaR1_F_err"]/df_ind["HaR1_F"])**2 + (df_ind["HaR2_F_err"]/df_ind["HaR2_F"])**2)
+        I_Ha06[i] = df_ind["I_Ha06"]
+        I_Ha06_err[i] = df_ind["I_Ha06_err"]
+
+    files_harps = df_harps["file"]
+    flux_R1_R2_harps = np.zeros((len(files_harps))); flux_R1_R2_err_harps = np.zeros((len(files_harps)))
+    I_Ha06_harps = np.zeros((len(files_harps))); I_Ha06_err_harps = np.zeros((len(files_harps)))
+    instr = "HARPS"
+    for i,file in enumerate(files_harps):
+        wv, f, f_err, hdr = read_fits(file.replace("teste_download", "teste_download_rv_corr"),instr,mode="rv_corrected")
+
+        headers = {"file": file,"instr": instr}
+        spectrum = dict(wave=wv, flux=f, flux_err=f_err)
+        df_ind = actin.CalcIndices(spectrum, headers, ["I_Ha06"],full_output=True).indices
+
+        flux_R1_R2_harps[i] = df_ind["HaR1_F"]/df_ind["HaR2_F"]
+        flux_R1_R2_err_harps[i] = flux_R1_R2_harps[i] * np.sqrt((df_ind["HaR1_F_err"]/df_ind["HaR1_F"])**2 + (df_ind["HaR2_F_err"]/df_ind["HaR2_F"])**2)
+        I_Ha06_harps[i] = df_ind["I_Ha06"]
+        I_Ha06_err_harps[i] = df_ind["I_Ha06_err"]
+    
+    plt.figure(4)
+    plt.errorbar(I_Ha06[mask], flux_R1_R2[mask], yerr=flux_R1_R2_err[mask], xerr=I_Ha06_err[mask], fmt="r.",label="UVES outlier")
+    plt.errorbar(I_Ha06[~mask], flux_R1_R2[~mask], yerr=flux_R1_R2_err[~mask], xerr=I_Ha06_err[~mask], fmt="b.",label="UVES non-outlier")
+    plt.errorbar(I_Ha06_harps, flux_R1_R2_harps, yerr=flux_R1_R2_err_harps, xerr=I_Ha06_err_harps, fmt="k.",label="HARPS")
+    plt.xlabel("I_Ha06")
+    plt.ylabel("Flux R1/R2")
+    plt.legend()
+    plt.savefig(f"uves_tests_fig/{star}_flux_Ha.pdf", overwrite=True, format = 'pdf', dpi=300)
+    plt.clf()
+    #plt.show()
 
 '''
 HD1461: 1 outlier com RV perto de 0. o BJD é muito menor que os outros (8/2005)

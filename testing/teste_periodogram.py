@@ -1,10 +1,10 @@
 import numpy as np, pandas as pd, matplotlib.pylab as plt
-from astropy.io import fits
 from PyAstronomy.pyTiming import pyPeriod # type: ignore
 from astropy.timeseries import LombScargle
 from scipy.signal import find_peaks
 from scipy.optimize import curve_fit
-from general_funcs import get_report_periodogram, read_bintable
+from general_funcs import read_bintable
+from periodogram_funcs import get_report_periodogram
 
 def FWHM_power_peak(power,period):
     max_power_index = np.argmax(power)

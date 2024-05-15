@@ -109,7 +109,7 @@ def get_sign_gls_peaks(df_peaks, df_peaks_WF, gaps, fap1, atol_frac=0.1, verb=Fa
     return np.sort(sel_peaks)
 
 #* GLS periodogram (Astropy):
-def gls(star, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5):
+def gls(star, instr, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5, save=False, folder_path=None):
     """Generalised Lomb-Scargle Periodogram using the `astropy` implementation.
 
     Args:
@@ -203,17 +203,9 @@ def gls(star, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5):
     axes[1].set_title("Fitting the data with GLS")
     axes[1].legend()
 
-    plt.figure(4, figsize=(7, 4))
-    plt.xlabel("Period [days]"); plt.ylabel("Power")
     period_list_WF = period
     period_max_WF = period[np.argmax(power_win)]
     results["period_best_WF"] = period_max_WF
-    plt.plot(period_list_WF, power_win, 'b-')
-    plt.title(f"Power vs Period for Astropy GLS Periodogram {star} Window Function")
-    for i in range(len(fap_levels)): # Add the FAP levels to the plot
-        plt.plot([min(period_list_WF), max(period_list_WF)], [plevels[i]]*2, '--',
-                label="FAP = %4.1f%%" % (fap_levels[i]*100))
-    plt.legend()
 
     peaks_WF, _ = find_peaks(power_win)
     sorted_peak_indices = np.argsort(power_win[peaks_WF])[::-1]  # Sort in descending order of power
@@ -229,6 +221,19 @@ def gls(star, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5):
     print("Significant Peaks:",sel_peaks)
     for peak in sel_peaks:
         axes[0].axvline(peak, ls='--', lw=0.7, color='orange')
+    plt.tight_layout()
+    if save == True: plt.savefig(folder_path+f"{star}_{instr}_GLS.pdf",bbox_inches="tight")
+
+    fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(7, 4))
+    axes.set_xlabel("Period [days]"); axes.set_ylabel("Power")
+    axes.plot(period_list_WF, power_win, 'b-')
+    axes.set_title(f"Power vs Period for Astropy GLS Periodogram {star} Window Function")
+    for i in range(len(fap_levels)): # Add the FAP levels to the plot
+        axes.plot([min(period_list_WF), max(period_list_WF)], [plevels[i]]*2, '--',
+                label="FAP = %4.1f%%" % (fap_levels[i]*100))
+    axes.legend()
+    plt.tight_layout()
+    if save == True: plt.savefig(folder_path+f"{star}_{instr}_WF.pdf",bbox_inches="tight")
 
     harmonics_list = get_harmonic_list(sel_peaks)
     period_err = results["std_period_best"]

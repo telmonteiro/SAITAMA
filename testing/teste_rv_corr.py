@@ -1,7 +1,8 @@
 import numpy as np, pandas as pd, matplotlib.pylab as plt, os, tarfile, glob, tqdm, time
 from astropy.io import fits
 from PyAstronomy import pyasl # type: ignore
-from general_funcs import (calc_fits_wv_1d, _get_simbad_data, read_fits, plot_line, read_bintable)
+from general_funcs import (calc_fits_wv_1d, read_fits, plot_line, read_bintable)
+from get_spec_funcs import (_get_simbad_data)
 from RV_correction_funcs import (correct_spec_rv, flag_ratio_RV_corr)
 
 def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, template_spec, drv, units, instrument, quick_RV):
@@ -27,9 +28,9 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
     #only uses two 250 Angstrom intervals, that change according to the instrument
     if quick_RV == True: 
         if instrument == "UVES": #doesn't include CaII H&K lines
-            w_ind_tiny = np.where((6400 < w) & (w < 6700) | (5500 > w) & (w > 5250)) #Halpha region and leftmost side of spectrum
+            w_ind_tiny = np.where((6400 < w) & (w < 6650) | (5500 > w) & (w > 5250)) #Halpha region and leftmost side of spectrum
         else: #HARPS or ESPRESSO
-            w_ind_tiny = np.where((6400 < w) & (w < 6700) | (5250 > w) & (w > 4900)) #Halpha region and CaII H&K region
+            w_ind_tiny = np.where((6400 < w) & (w < 6650) | (5150 > w) & (w > 4900)) #Halpha region and CaII H&K region
         w_cut = w_cut[w_ind_tiny]
         f_cut = f_cut[w_ind_tiny]   
 
@@ -70,7 +71,7 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
 stars = ['HD209100']#, 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', 'HD1461', 
         # 'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536']
 
-instr = "HARPS"
+instr = "UVES"
 
 for target_save_name in stars:
     file_directory = glob.glob(os.path.join(f"teste_download_rv_corr/{target_save_name}/{target_save_name}_{instr}/", f"df_stats_{target_save_name}.fits"))
@@ -110,7 +111,7 @@ for target_save_name in stars:
         plt.figure(4)
         plt.plot(wv_corr,f)
 
-        #plt.show()
+        plt.show()
 
 #for HD209100 UVES (62 spectra):
 #using drv = 0.1 and full spectra: 16:06 -22635.000000005533
