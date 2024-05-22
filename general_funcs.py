@@ -166,10 +166,10 @@ def stats_indice(star,cols,df):
             df_stats.loc[len(df_stats)] = row
     elif len(cols) > 1:
         for i in cols:
-            if i != "rv":
+            if i not in ["rv","S_MW","log_Rhk", "prot_n84", "prot_m08"]:
                 indices = df[df[i+"_Rneg"] < 0.01].index
                 data = df.loc[indices, i]
-            else: data = df["rv"]
+            else: data = df[i]
             if len(data) != 0:
                 row = {"star": star, "indice": i,
                     "max": max(data), "min": min(data),
@@ -239,7 +239,7 @@ def plot_line(data, line, line_color=None,offset=0, line_legend="", lstyle = "-"
 
 #################################
     
-def general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_period, flag_rv_ratio):
+def instrument_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_period, flag_rv_ratio, age_m08, age_m08_err):
     '''
     Takes the data array that consists in a 3D cube containing the wavelength and flux for each spectrum used and
     the data frame with the statistics.
@@ -247,6 +247,8 @@ def general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, 
     hdr = fits.Header() 
 
     if math.isnan(float(period_err)): period_err = 0
+    if math.isnan(float(age_m08)): age_m08 = 0
+    if math.isnan(float(age_m08_err)): age_m08_err = 0
 
     star_id = stats_df["star"][0]; time_span = stats_df["time_span"][0]; #N_spectra = stats_df["N_spectra"][0]
     dict_hdr = {"STAR_ID":[star_id,'Star ID in HD catalogue'],
@@ -259,16 +261,19 @@ def general_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, 
                 "PERIOD_I_CaII_ERR":[period_err,"Error of period of CaII activity index"],
                 "FLAG_PERIOD":[flag_period,"Goodness of periodogram fit flag. Color based."],
                 "FLAG_RV":[flag_rv_ratio,"Goodness of RV correction indicador. 1 = all good"],
+                "AGE_M08":[age_m08,"Age Mamajek & Hillenbrand 2008"],
+                "AGE_M08_ERR":[age_m08_err,"Error Age Mamajek & Hillenbrand 2008"],
                 "COMMENT":["Spectra based on SNR - time span trade-off","Comment"],
                 "COMMENT1":["RV obtained from CCF measure (m/s)","Comment"],
                 "COMMENT2":["3D data of wv (Angs) and flux of each spectrum","Comment"]}
 
-    indices = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv']
+    indices = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv', "S_MW", "log_Rhk", "prot_n84", "prot_m08"]
     stats = ["max","min","mean","median","std","N_spectra"]
 
     for i,ind in enumerate(indices):
         for col in stats:
             stat = stats_df[col][i]
+            if math.isnan(float(stat)): stat = 0
             if col == "rv": comment = f"{col} of {ind.upper()} (m/s)"
             elif col == "N_spectra": comment = f"Nr of spectra used in {ind}"
             else: comment = f"{col} of {ind}"

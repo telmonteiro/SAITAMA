@@ -24,6 +24,35 @@ def FWHM_power_peak(power,period):
         fwhm=0
     return fwhm, left_boundary_period, right_boundary_period, half_max_power
 
+
+def VanderPlas_52(power,period,T_span,approximate=True):
+    '''Computing the standard deviation of the peak using equation 52 from "Understanding the Lomb-Scargle Periodogram", 
+    VanderPlas 2018.
+    Warning: I have serious doubts if this is well applied. Can't find good info about how the SNR is properly computed.
+    The number of samples N is also the sampling of the periodogram, not the real number of observations.'''
+    if approximate == True:
+        f_1_2 = T_span
+    else: 
+        max_power_index = np.argmax(power)
+        max_power = power[max_power_index]
+        half_max_power = max_power / 2
+        left_boundary_index = np.where(power[max_power_index:] < half_max_power)[0][0] + max_power_index
+        left_boundary_period = period[left_boundary_index]
+        f_1_2 = period[max_power_index] - left_boundary_period
+
+    # Number of data points
+    N = len(period)
+
+    # Calculate signal-to-noise ratio (SNR)
+    mu = np.mean(power)
+    sigma_n = np.std(power)
+    x = (power - mu) / sigma_n
+    Sigma = np.sqrt(np.sum(x**2) / N) #computing the rms to obtain the SNR
+
+    sigma_f = f_1_2 * np.sqrt(2 / (N * Sigma ** 2))
+
+    return sigma_f
+
 def are_harmonics(period1, period2, tolerance=0.01):
     ratio = period1 / period2
     # Check if the ratio is close to an integer or simple fraction
@@ -41,26 +70,27 @@ def get_harmonic_list(period):
                 harmonics_list.append([period[i], period[j]])
     return harmonics_list
 
-def periodogram_flagging(harmonics_list, period, period_err, power_list, plevels, t_span):
+def periodogram_flagging(harmonics_list, period, period_err, peaks_power, plevels, t_span):
     '''
-    Green/4: error < 20% and no harmonics in significant peaks
-    Yellow/3: 30% > error > 20% and no harmonics in significant peaks
-    Orange/2: harmonics in significant peaks, no error or error > 30%
+    Green/4: error < 20% and no harmonics in significant peaks involving the max peak
+    Yellow/3: 30% > error > 20% and no harmonics in significant peaks involving the max peak
+    Orange/2: harmonics involving the max peak, no error or error > 30%
     Red/1: many periods with power close to each under: if number of periods over 85% of the max > 0
            or if the period obtained is bigger than the time span
     Black/0: discarded - period under 1 yr or over 100 yrs, below FAP 1% level
     '''
+    harmonics_list = list(np.unique(np.array(harmonics_list)))
     error = period_err/period * 100
-    powers_close_max = [n for n in power_list if n > 0.85*np.max(power_list)]
+    powers_close_max = [n for n in peaks_power if n > 0.9*np.max(peaks_power) and n != np.max(peaks_power)]
 
-    if np.max(power_list) < plevels[-1] or period < 365 or period > 100*365:
+    if np.max(peaks_power) < plevels[-1] or period < 365 or period > 100*365:
         flag = "black"
     else:
-        if 0 < error <= 20 and len(harmonics_list) == 0 and period < t_span and len(powers_close_max) == 0:
+        if 0 < error <= 20 and (period not in harmonics_list) and period < t_span and len(powers_close_max) == 0:
             flag = "green"
-        elif 20 < error <= 30 and len(harmonics_list) == 0 and period < t_span:
+        elif 20 < error <= 30 and period not in harmonics_list and period < t_span and len(powers_close_max) == 0:
             flag = "yellow"
-        elif (len(harmonics_list) > 0 or period_err == 0.0 or error > 30) and period < t_span:
+        elif (period in harmonics_list or period_err == 0.0 or error > 30) and period < t_span and len(powers_close_max) == 0:
             flag = "orange"
         elif len(powers_close_max) > 0 or period > t_span:
             flag = "red"
@@ -243,7 +273,7 @@ def gls(star, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5):
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(13, 4))
     fig.suptitle(f"GLS Astropy periodogram for {star} I_CaII", fontsize=12)
     axes[0].set_xlabel("Period [days]"); axes[0].set_ylabel("Power")
-    axes[0].plot(period, power, 'b-')
+    axes[0].semilogx(period, power, 'b-')
     axes[0].set_title(f"Power vs Period for GLS Periodogram")
     plevels = [fap5,fap1]
     for i in range(len(fap_levels)): # Add the FAP levels to the plot
@@ -251,9 +281,13 @@ def gls(star, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5):
                 label="FAP = %4.1f%%" % (fap_levels[i]*100))
     axes[0].legend()
     
-    fwhm, left_boundary_period, right_boundary_period, half_max_power = FWHM_power_peak(power,period)
-    results["FWHM_period_best"] = fwhm
-    results["std_period_best"] = fwhm / (2*np.sqrt(2*np.log(2)))
+    #fwhm, left_boundary_period, right_boundary_period, half_max_power = FWHM_power_peak(power,period)
+    #axes[0].axvline(left_boundary_period,color="r"); axes[0].axvline(right_boundary_period,color="r"); axes[0].axhline(half_max_power,color="r")
+    #results["FWHM_period_best"] = fwhm
+    #results["std_period_best"] = fwhm / (2*np.sqrt(2*np.log(2)))
+    T_span = t
+    uncertainty = VanderPlas_52(power,period,T_span)
+    results["std_period_best"] = uncertainty
 
     period_max = peaks_period[0]
     results["period_best"] = period_max
@@ -274,7 +308,8 @@ def gls(star, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5):
     period_list_WF = period
     period_max_WF = period[np.argmax(power_win)]
     results["period_best_WF"] = period_max_WF
-    plt.plot(period_list_WF, power_win, 'b-')
+    plt.semilogx(period_list_WF, power_win, 'b-',label="WF")
+    plt.semilogx(period, power, 'r-',lw=0.7,label="data")
     plt.title(f"Power vs Period for Astropy GLS Periodogram {star} Window Function")
     for i in range(len(fap_levels)): # Add the FAP levels to the plot
         plt.plot([min(period_list_WF), max(period_list_WF)], [plevels[i]]*2, '--',
@@ -291,14 +326,16 @@ def gls(star, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5):
     df_peaks_WF = pd.DataFrame({"peaks_period_win":peaks_period_win,"peaks_power_win":peaks_power_win})
     gaps = gaps_time(x)
     print("Gaps in BJD:", gaps)
+    for gap in gaps:
+        plt.axvline(gap, ls='--', lw=0.7, color='green')
     sel_peaks = get_sign_gls_peaks(df_peaks, df_peaks_WF, gaps, fap1, atol_frac=0.1, verb=False, evaluate_gaps=False)
     print("Significant Peaks:",sel_peaks)
     for peak in sel_peaks:
-        axes[0].axvline(peak, ls='--', lw=0.7, color='orange')
+        axes[0].axvline(peak, ls='--', lw=0.8, color='orange')
 
     harmonics_list = get_harmonic_list(sel_peaks)
     period_err = results["std_period_best"]
-    flag = periodogram_flagging(harmonics_list, period_max, period_err, power, plevels, t_span)
+    flag = periodogram_flagging(harmonics_list, period_max, period_err, peaks_power, plevels, t_span)
     print("Flag: ",flag)
 
     return results, gaps, flag, period_max, period_err, harmonics_list
