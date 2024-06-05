@@ -118,13 +118,16 @@ def calc_fits_wv_1d(hdr, key_a='CRVAL1', key_b='CDELT1', key_c='NAXIS1'):
 
 def sigma_clip(df, cols, sigma):
     '''
-    Rough sigma clipping of a data frame.
+    Rough sigma clipping of a data frame, allowing for NaN values.
     '''
     for col in cols:
-        if math.isnan(list(df[col])[0]) == False:
-            mean= df[col].mean()
-            std = df[col].std()
-            df = df[(df[col] >= mean - sigma * std) & (df[col] <= mean + sigma * std)]
+        # Ignore NaN values for the mean and standard deviation calculation
+        mean = df[col].dropna().mean()
+        std = df[col].dropna().std()
+        
+        # Apply sigma clipping, retaining NaN values
+        df = df[((df[col].isna()) | ((df[col] >= mean - sigma * std) & (df[col] <= mean + sigma * std)))]
+        
     return df
 
 ########################
@@ -151,44 +154,43 @@ def plot_RV_indices(star,df,indices,save, path_save):
         plt.savefig(path_save, bbox_inches="tight")
 
 #########################
-    
-def stats_indice(star,cols,df):
-    """
-    Return pandas data frame with statistical data on the indice(s) given: max, min, mean, median, std and N (number of spectra)
-    """
-    df_stats = pd.DataFrame(columns=["star","indice","max","min","mean","median","std","time_span","N_spectra"])
-    if len(cols) == 1:
-            row = {"star":star,"column":cols,
-                "max":max(df[cols]),"min":min(df[cols]),
-                "mean":np.mean(df[cols]),"median":np.median(df[cols]),
-                "std":np.std(df[cols]),"time_span":max(df["bjd"])-min(df["bjd"]),
-                "N_spectra":len(df[cols])}
-            df_stats.loc[len(df_stats)] = row
-    elif len(cols) > 1:
-        for i in cols:
-            if i not in ["rv","S_MW","log_Rhk", "prot_n84", "prot_m08"]:
-                indices = df[df[i+"_Rneg"] < 0.01].index
-                data = df.loc[indices, i]
-            else: data = df[i]
-            if len(data) != 0:
-                row = {"star": star, "indice": i,
-                    "max": max(data), "min": min(data),
-                    "mean": np.mean(data), "median": np.median(data),
-                    "std": np.std(data), "time_span": max(df["bjd"]) - min(df["bjd"]),
-                    "N_spectra": len(data)}
-                df_stats.loc[len(df_stats)] = row
-            else: 
-                row = {"star": star, "indice": i,
-                    "max": 0, "min": 0,
-                    "mean": 0, "median": 0,
-                    "std": 0, "time_span": max(df["bjd"]) - min(df["bjd"]),
-                    "N_spectra": len(data)}
-                df_stats.loc[len(df_stats)] = row
 
-    else:
+def stats_indice(star, cols, df):
+    """
+    Return pandas DataFrame with statistical data on the indice(s) given: max, min, mean, median, std and N (number of spectra)
+    """
+    df_stats = pd.DataFrame(columns=["star", "indice", "max", "min", "mean", "median", "std", "time_span", "N_spectra"])
+
+    if len(cols) < 1:
         print("ERROR: No columns given")
-        df_stats = None
-    
+        return None
+
+    for col in cols:
+        if col not in df.columns:
+            print(f"WARNING: Column {col} not found in DataFrame")
+            continue
+
+        data = pd.to_numeric(df[col], errors='coerce')  # Ensure data is numeric, coercing errors to NaN
+        data = data.dropna()  # Remove NaN values
+
+        bad_ind = [i for i,d in enumerate(data) if d == 1e+20] #when converting log Rhk this can happen
+        data = data.drop(df.index[bad_ind])
+
+        if len(data) == 0:
+            row = {"star": star, "indice": col,
+                "max": np.nan, "min": np.nan,
+                "mean": np.nan, "median": np.nan,
+                "std": np.nan, "time_span": np.nan,
+                "N_spectra": 0}
+        else:
+            row = {"star": star, "indice": col,
+                "max": data.max(), "min": data.min(),
+                "mean": data.mean(), "median": data.median(),
+                "std": data.std(), "time_span": df["bjd"].max() - df["bjd"].min(),
+                "N_spectra": len(data)}
+        
+        df_stats.loc[len(df_stats)] = row
+
     return df_stats
 
 ########################
@@ -239,30 +241,28 @@ def plot_line(data, line, line_color=None,offset=0, line_legend="", lstyle = "-"
 
 #################################
     
-def instrument_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_period, flag_rv_ratio, age_m08, age_m08_err):
+def instrument_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_period, flag_rv_ratio):
     '''
     Takes the data array that consists in a 3D cube containing the wavelength and flux for each spectrum used and
     the data frame with the statistics.
     '''
     hdr = fits.Header() 
 
+    if math.isnan(float(period)): period = 0
     if math.isnan(float(period_err)): period_err = 0
-    if math.isnan(float(age_m08)): age_m08 = 0
-    if math.isnan(float(age_m08_err)): age_m08_err = 0
 
-    star_id = stats_df["star"][0]; time_span = stats_df["time_span"][0]; #N_spectra = stats_df["N_spectra"][0]
+    star_id = stats_df["star"][0]; time_span = stats_df["time_span"][0]
     dict_hdr = {"STAR_ID":[star_id,'Star ID in HD catalogue'],
                 "INSTR":[instr,"Instrument used"],
                 "TIME_SPAN":[time_span, 'Time span in days between first and last observations used'],
-                #"N_SPECTRA":[N_spectra,"Number of spectra used"],
                 "SNR_MIN":[min_snr,"Minimum SNR"],
                 "SNR_MAX":[max_snr,"Maximum SNR"],
                 "PERIOD_I_CaII":[period,"Period of CaII activity index"],
                 "PERIOD_I_CaII_ERR":[period_err,"Error of period of CaII activity index"],
                 "FLAG_PERIOD":[flag_period,"Goodness of periodogram fit flag. Color based."],
                 "FLAG_RV":[flag_rv_ratio,"Goodness of RV correction indicador. 1 = all good"],
-                "AGE_M08":[age_m08,"Age Mamajek & Hillenbrand 2008"],
-                "AGE_M08_ERR":[age_m08_err,"Error Age Mamajek & Hillenbrand 2008"],
+                #"AGE_M08":[age_m08,"Age Mamajek & Hillenbrand 2008"],
+                #"AGE_M08_ERR":[age_m08_err,"Error Age Mamajek & Hillenbrand 2008"],
                 "COMMENT":["Spectra based on SNR - time span trade-off","Comment"],
                 "COMMENT1":["RV obtained from CCF measure (m/s)","Comment"],
                 "COMMENT2":["3D data of wv (Angs) and flux of each spectrum","Comment"]}
@@ -278,9 +278,16 @@ def instrument_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, perio
             elif col == "N_spectra": comment = f"Nr of spectra used in {ind}"
             else: comment = f"{col} of {ind}"
             dict_hdr[ind.upper()+"_"+col.upper()] = [stat,comment]
-    
+
+    #for keyword in dict_hdr.keys():
+    #    hdr.append(("HIERARCH "+keyword, dict_hdr[keyword][0], dict_hdr[keyword][1]), end=True)
+
     for keyword in dict_hdr.keys():
-        hdr.append(("HIERARCH "+keyword, dict_hdr[keyword][0], dict_hdr[keyword][1]), end=True)
+        value = dict_hdr[keyword][0]
+        if isinstance(value, float) and np.isnan(value):
+            # Handle NaN values here, for example, replace them with 0
+            value = 0
+        hdr.append(("HIERARCH "+keyword, value, dict_hdr[keyword][1]), end=True)
 
     df.columns = df.columns.astype(str)
     table = Table.from_pandas(df)
@@ -302,3 +309,44 @@ def read_bintable(file,print_info=False):
     data_dict = astropy_table.to_pandas().to_dict()
     df = pd.DataFrame(data_dict)
     return df, hdr
+    
+#################################
+
+import matplotlib.pyplot as plt
+
+def plot_RV_indices_diff_instr(star, df, indices, save, path_save):
+    """
+    Plot RV and indices given as a function of time
+    """
+
+    instruments = df["instr"].unique()  # Get unique instruments
+
+    plt.figure(figsize=(6.5, (len(indices) + 1.5) * 2))
+    plt.suptitle(star, fontsize=14)
+
+    for i, instrument in enumerate(instruments):
+        instr_df = df[df["instr"] == instrument]
+
+        for j, index in enumerate(indices):
+            plt.subplot(len(indices) + 1, 1, j + 1)
+            plt.ylabel(index)
+            plt.errorbar(instr_df["bjd"] - 2450000, instr_df[index], instr_df[index + "_err"], fmt='.', label=instrument)
+            plt.legend()
+
+        plt.subplot(len(indices) + 1, 1, len(indices) + 1)
+        if "rv_err" not in instr_df.columns:
+            yerr = 0
+        else:
+            yerr = instr_df["rv_err"]
+        plt.errorbar(instr_df["bjd"] - 2450000, instr_df["rv"], yerr, fmt='.', label=instrument)
+        plt.ylabel("RV [m/s]")
+
+    plt.xlabel("BJD $-$ 2450000 [days]")
+    plt.legend()
+    plt.subplots_adjust(top=0.95)
+
+    if save:
+        plt.savefig(path_save, bbox_inches="tight")
+
+##################################
+

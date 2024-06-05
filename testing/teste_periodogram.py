@@ -53,6 +53,12 @@ def VanderPlas_52(power,period,T_span,approximate=True):
 
     return sigma_f
 
+def error_from_fit(x,y, period_max):
+    def sin_model(x, a, phi, omega, period):
+        return a * np.sin(2 * np.pi * x/period + phi) + omega
+    p1, pcov1 = curve_fit(sin_model, x, y, bounds=((-np.inf, -np.inf, -np.inf, 0.9*period_max), (np.inf, np.inf, np.inf, 1.1*period_max)))
+    return p1, np.sqrt(np.diag(pcov1))
+
 def are_harmonics(period1, period2, tolerance=0.01):
     ratio = period1 / period2
     # Check if the ratio is close to an integer or simple fraction
@@ -302,6 +308,10 @@ def gls(star, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5):
     axes[1].set_xlabel('BJD $-$ 2450000 [days]'); axes[1].set_ylabel(r'$S_\mathrm{CaII}$')
     axes[1].set_title("Fitting the data with GLS")
     axes[1].legend()
+
+    params, stds = error_from_fit(x,y, period_max)
+    print(params)
+    print(stds)
 
     plt.figure(4, figsize=(7, 4))
     plt.xlabel("Period [days]"); plt.ylabel("Power")

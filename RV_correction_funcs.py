@@ -40,9 +40,9 @@ def get_rv_ccf(star, stellar_wv, stellar_flux, stellar_header, template_hdr, tem
         if instrument == "HARPS":
             rvmin = rv_simbad - 5; rvmax = rv_simbad + 5
         elif instrument == "UVES":
-            rvmin = rv_simbad - 80; rvmax = rv_simbad + 80
+            rvmin = rv_simbad - 100; rvmax = rv_simbad + 100
         elif instrument == "ESPRESSO":
-            rvmin = rv_simbad - 80; rvmax = rv_simbad + 80
+            rvmin = rv_simbad - 100; rvmax = rv_simbad + 100
     except:
         rvmin = -150; rvmax = 150
 
