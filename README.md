@@ -20,9 +20,12 @@ This pipeline uses the ACTIN tool (2018JOSS....3..667G and 2021A&A...646A..77G) 
 - Corrects the spectra by RV comparing the spectra to a spectrum of the Sun with a CCF.
 - Computes a quality indicator of the RV correction.
 - Runs ACTIN2 on the spectra and obtains activity indices for CaII H&K, H$\alpha$ at 0.6 A and NaI.
+- Converts the CaII H&K indice to S_MW and log R'_HK.
 - Computes a periodogram using GLS to retrieve the period of CaII H&K, and flags it according to a quality indicator.
 - Saves plots of the spectra in lines of interest to check if everything is alright, as well as plots of the activity indices and the statistics related to them.
 - Saves the statistics and data frame in a fits file.
+
+- Then combines the fits file for each instrument given, trimms the data and recomputes the statistics and the periodogram.
 
 Input parameters:
 - stars: object identifiers, preferentially in the HD catalogue. Must be in a list format
@@ -35,6 +38,8 @@ Input parameters:
 the pipeline would download the spectra to)
 - neglect_data: spectra to be manually neglected for whatever reason
 - username_eso: username in the ESO data base to download the data
+- download_path: path to where the spectra is downloaded
+- final_path: where the products of the pipeline are stored
 
 Returns:
 - creates a folder teste_download_rv_corr/{star} where all the produced files are stored
@@ -48,6 +53,9 @@ standard deviation, time span and number of spectra used for that indice
 and informations regarding the periodogram in the header
 - report_periodogram_{star}.txt: txt file that contains a small report on the periodogram computed and the WF, as well as the harmonics
 - flag_ratios_{instrument}.txt: adds to a txt file the names of the badly corrected spectra and the RV flag ratio
+- master_df_{target_save_name}.fits: FITS file that contains the information for each instrument separately plus a BINTable + Header for the combined data
+- {star}_GLS.pdf and {star}_WF.pdf: plots of the periodogram of the CaII H&K indice and the respective Window Function for the combined data
+- report_periodogram_{star}.txt: txt file that contains a small report on the periodogram computed and the WF, as well as the harmonics for the combined data
 
 For now, the testing phase of this pipeline includes the 3 stars from Pepe et al. 2011 and 15 other stars chosen from SWEET-Cat, that agree with
 - Vmag < 8
@@ -65,10 +73,10 @@ HD47536 was particularly chosen because it has a low number of spectra available
 
 Dependencies: numpy, matplotlib, tqdm, time, logging, pandas, astroquery, astropy, math, PyAstronomy, ACTIN2
 
-The code was written inside WSL Ubuntu.
+The code was written and ran inside WSL Ubuntu.
 
 ## Problems and future work
 
 - the periodogram computation is under study
-- a comparison between the HARPS and UVES activity indices is under way
-- use calibrations to compute the age and rotation of the stars
+- a comparison between the HARPS and UVES activity indices is incomplete
+- the conversion to log R'_HK is still under study
