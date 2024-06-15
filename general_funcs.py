@@ -7,6 +7,9 @@ import matplotlib.pylab as plt
 import math
 from astropy.io import fits
 from astropy.table import Table
+from pyrhk.pyrhk import calc_smw, get_bv, calc_rhk, calc_prot_age
+from PyAstronomy import pyasl # type: ignore
+import urllib.request
 
 def read_fits(file_name,instrument,mode):
     '''
@@ -157,9 +160,10 @@ def plot_RV_indices(star,df,indices,save, path_save):
 
 def stats_indice(star, cols, df):
     """
-    Return pandas DataFrame with statistical data on the indice(s) given: max, min, mean, median, std and N (number of spectra)
+    Return pandas DataFrame with statistical data on the indice(s) given: max, min, mean, median, std, weighted mean and N (number of spectra)
+    Used for I_CaII, I_Ha06, I_NaI, rv, S_MW, log_Rhk, prot_n84, prot_m08
     """
-    df_stats = pd.DataFrame(columns=["star", "indice", "max", "min", "mean", "median", "std", "time_span", "N_spectra"])
+    df_stats = pd.DataFrame(columns=["star", "indice", "max", "min", "mean", "median", "std", "weighted_mean", "time_span", "N_spectra"])
 
     if len(cols) < 1:
         print("ERROR: No columns given")
@@ -175,18 +179,31 @@ def stats_indice(star, cols, df):
 
         bad_ind = [i for i,d in enumerate(data) if d == 1e+20] #when converting log Rhk this can happen
         data = data.drop(df.index[bad_ind])
+        
+        if col != "rv":
+            data_err = pd.to_numeric(df[col+"_err"], errors='coerce')  # Ensure data is numeric, coercing errors to NaN
+            data_err = data_err.dropna()  # Remove NaN values
+            data_err = data_err.drop(df.index[bad_ind])
 
         if len(data) == 0:
             row = {"star": star, "indice": col,
                 "max": np.nan, "min": np.nan,
                 "mean": np.nan, "median": np.nan,
-                "std": np.nan, "time_span": np.nan,
+                "std": np.nan, "weighted_mean": np.nan,
+                "time_span": np.nan,
                 "N_spectra": 0}
         else:
+            if col == "rv":
+                weighted_mean = np.nan
+            else:
+                weights = 1/(data_err)**2
+                weighted_mean = np.sum(weights * data) / np.sum(weights)
+            
             row = {"star": star, "indice": col,
                 "max": data.max(), "min": data.min(),
                 "mean": data.mean(), "median": data.median(),
-                "std": data.std(), "time_span": df["bjd"].max() - df["bjd"].min(),
+                "std": data.std(), "weighted_mean": weighted_mean,
+                "time_span": df["bjd"].max() - df["bjd"].min(),
                 "N_spectra": len(data)}
         
         df_stats.loc[len(df_stats)] = row
@@ -267,8 +284,8 @@ def instrument_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, perio
                 "COMMENT1":["RV obtained from CCF measure (m/s)","Comment"],
                 "COMMENT2":["3D data of wv (Angs) and flux of each spectrum","Comment"]}
 
-    indices = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv', "S_MW", "log_Rhk", "prot_n84", "prot_m08"]
-    stats = ["max","min","mean","median","std","N_spectra"]
+    indices = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv', "S_MW", "log_Rhk", "prot_n84", "prot_m08","age_m08"]
+    stats = ["max","min","mean","median","std","weighted_mean","N_spectra"]
 
     for i,ind in enumerate(indices):
         for col in stats:
@@ -312,8 +329,6 @@ def read_bintable(file,print_info=False):
     
 #################################
 
-import matplotlib.pyplot as plt
-
 def plot_RV_indices_diff_instr(star, df, indices, save, path_save):
     """
     Plot RV and indices given as a function of time
@@ -350,3 +365,48 @@ def plot_RV_indices_diff_instr(star, df, indices, save, path_save):
 
 ##################################
 
+def get_calibrations_CaII(star_gaia_dr3,I_CaII,I_CaII_err):
+    '''Function to convert the I_CaII indice to Mount-Wilson index S_MW and to log R'_HK using the B-V color.
+    Also computes if possible the rotation period with two different calibrations and the chromospheric age.
+    Uses functions from the https://github.com/gomesdasilva/pyrhk/tree/master repository.
+    
+    Input parameters:
+    - star_gaia_dr3: str in the format "GAIA DR3 ######", as only a part of the stars in SWEET-Cat has HD identifier.
+    - I_CaII: activity indice from ACTIN2 for CaII H&K line.
+    - I_CaII_err: error of the activity indice.
+    
+    Output parameters:
+    - log_rhk, log_rhk_err: activity indice for CaII H&K line in log R'_HK scale and respective error
+    - prot_n84, prot_n84_err: rotation period and respective error with the Noyes et al. (1984) calibration
+    - prot_m08, prot_m08_err: rotation period and respective error with the Mamajek & Hillenbrand (2008) calibration
+    - age_m08, age_m08_err : chromospheric age and respective error with the Mamajek & Hillenbrand (2008) calibration
+    '''
+
+    #converting to Mount-Wilson index S_MW
+    smw, smw_err = calc_smw(caii=I_CaII, caii_err=I_CaII_err, instr="HARPS_GDS21")
+    smw = smw.astype(float); smw_err = smw_err.astype(float)
+
+    #get Teff from SWEET-Cat
+    sweetCat_table_url = "http://sweetcat.iastro.pt/catalog/SWEETCAT_Dataframe.csv"
+    dtype_SW = dtype={'gaia_dr2':'int64','gaia_dr3':'int64'}
+    SC = pd.read_csv(urllib.request.urlopen(sweetCat_table_url), dtype=dtype_SW)
+    teff = SC[SC["gaia_dr3"]==int(star_gaia_dr3[9:])]["Teff"].values[0]
+
+    #get B-V from SIMBAD, if none get from Ballesteros calibration
+    bv, bv_err, bv_ref = get_bv(star_gaia_dr3, alerts=True) 
+    if math.isnan(bv) == True:
+        b = pyasl.BallesterosBV_T()
+        bv = b.t2bv(T=teff) 
+
+    #converting to log R'_HK using B-V. if star is M type (Teff < 3700 K) use the mascareno calibration, otherwise the rutten
+    if teff < 3700:
+        method_to_use = "mascareno"
+    else: method_to_use = "rutten"
+
+    log_rhk, log_rhk_err, rhk, rhk_err = calc_rhk(smw, smw_err, bv, method=method_to_use) #what about the evstage?
+
+    #computing rotation period of star using 2 different calibrations, as well as the age of the star if possible
+    prot_n84, prot_n84_err, prot_m08, prot_m08_err, age_m08, age_m08_err = calc_prot_age(log_rhk, bv)
+    #for HARPS and ESPRESSO this may work well, but for UVES the calibrations may be bad or non existent?
+
+    return smw, smw_err, log_rhk, log_rhk_err, prot_n84, prot_n84_err, prot_m08, prot_m08_err, age_m08, age_m08_err

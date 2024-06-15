@@ -1,35 +1,46 @@
-'''
-This file contains functions to be used to compute the activity periodogram in the ACTINometer pipeline
-'''
-import numpy as np
-import pandas as pd
-import matplotlib.pylab as plt
-from astropy.table import Table
-from PyAstronomy import pyasl # type: ignore
+import numpy as np, pandas as pd, matplotlib.pylab as plt, math
 from PyAstronomy.pyTiming import pyPeriod # type: ignore
 from astropy.timeseries import LombScargle
 from scipy.signal import find_peaks
 from scipy.optimize import curve_fit
+from sklearn.metrics import mean_squared_error # type: ignore
+from general_funcs import read_bintable
+from periodogram_funcs import get_report_periodogram
 
-def FWHM_power_peak(power,period):
-    max_power_index = np.argmax(power)
-    max_power = power[max_power_index]
-    # Determine the half-maximum power level
-    half_max_power = max_power / 2
-    # Find the left and right boundaries at half-maximum power
-    try:
-        right_boundary_index = np.where(power[:max_power_index] < half_max_power)[0][-1]
-        right_boundary_period = period[right_boundary_index]
-        left_boundary_index = np.where(power[max_power_index:] < half_max_power)[0][0] + max_power_index
-        left_boundary_period = period[left_boundary_index]
-        fwhm = right_boundary_period - left_boundary_period
-    except: 
-        right_boundary_period = 0
-        left_boundary_period = 0
-        fwhm=0
-    return fwhm, left_boundary_period, right_boundary_period, half_max_power
+def PyAstronomy_error(t,y,power, ofac, hifac, freq=None):
+    '''Period error estimation of the periodogram based on the GLS implementation by PyAstronomy.'''
+    N = len(y)
+    if freq == None:
+        th = t - np.min(t)
+        tbase = np.max(th)
+        #ofac = 10; hifac = 1 #default values in PyAstronomy
+        
+        fstep = 1 / ofac / tbase; fnyq = 1/2 / tbase * N #0.01121490182039829
+        fbeg = fstep; fend = fnyq * hifac
+        
+        freq = np.arange(fbeg, fend, fstep)
 
-##################################################################################################################
+    nf = len(freq)
+
+    k = np.argmax(power)
+    # Maximum power
+    pmax = power[k]
+
+    # Get the curvature in the power peak by fitting a parabola y=aa*x^2
+    if 1 < k < nf-2:
+        # Shift the parabola origin to power peak
+        xh = (freq[k-1:k+2] - freq[k])**2
+        yh = power[k-1:k+2] - pmax
+        # Calculate the curvature (final equation from least square)
+        aa = np.dot(yh, xh) / np.dot(xh, xh)
+        e_f = np.sqrt(-2./N / aa * (1.-pmax))
+        Psin_err = e_f / freq[k]**2
+    else:
+        e_f = np.nan
+        Psin_err= np.nan
+    
+    return e_f, Psin_err
+
 
 def VanderPlas_52(t,y,y_err,power,period,T_span,approximate=False):
     '''Computing the standard deviation of the peak using equation 52 from "Understanding the Lomb-Scargle Periodogram", 
@@ -64,62 +75,22 @@ def VanderPlas_52(t,y,y_err,power,period,T_span,approximate=False):
 
     return sigma_p
 
-##################################################################################################################
-
-def PyAstronomy_error(t,y,power,freq=None):
-    '''Period error estimation of the periodogram based on the GLS implementation by PyAstronomy.'''
-    N = len(y)
-    if freq == None:
-        th = t - np.min(t)
-        tbase = np.max(th)
-        ofac = 10; hifac = 1 #default values in PyAstronomy
-        
-        fstep = 1 / ofac / tbase; fnyq = 1/2 / tbase * N
-        fbeg = fstep; fend = fnyq * hifac
-        
-        freq = np.arange(fbeg, fend, fstep)
-
-    nf = len(freq)
-
-    k = np.argmax(power)
-    # Maximum power
-    pmax = power[k]
-    
-    # Get the curvature in the power peak by fitting a parabola y=aa*x^2
-    if 1 < k < nf-2:
-        # Shift the parabola origin to power peak
-        xh = (freq[k-1:k+2] - freq[k])**2
-        yh = power[k-1:k+2] - pmax
-        # Calculate the curvature (final equation from least square)
-        aa = np.dot(yh, xh) / np.dot(xh, xh)
-        e_f = np.sqrt(-2./N / aa * (1.-pmax))
-        Psin_err = e_f / freq[k]**2
-    else:
-        e_f = np.nan
-        Psin_err= np.nan
-    
-    return e_f, Psin_err
-
-##################################################################################################################
-
 def curve_fit_error(x,y, period_max):
     '''Computes the error of the period obtained from periodogram by fitting a curve_fit restrained enough so that the period obtained
     is the same as from the periodogram.'''
-    def sin_model(x, a, phi, omega, period):
-        return a * np.sin(2 * np.pi * x/period + phi) + omega
+    def sin_model(x, a, phi, omega, m,period):
+        return a * np.sin(2 * np.pi * x/period + phi) + omega + m*x
     
-    bounds = ((0, -np.inf, -np.inf, 0.99999*period_max), (np.inf, np.inf, np.inf, 1.00001*period_max))
-    bounds = ((0, -np.inf, -np.inf, -np.inf), (np.inf, np.inf, np.inf, np.inf))
+    #bounds=((0, -np.inf, -np.inf, 0.99999*period_max), (np.inf, np.inf, np.inf, 1.00001*period_max))
+    bounds = ((0, -np.inf, -np.inf, -np.inf, period_max-300), (np.inf, np.inf, np.inf, np.inf, period_max+300))
 
     p1, pcov1 = curve_fit(sin_model, x, y, bounds=bounds)
 
     return p1, np.sqrt(np.diag(pcov1))
 
-##################################################################################################################
-
 def are_harmonics(period1, period2, tolerance=0.01):
     ratio = period1 / period2
-    if period1 < 2*365 or period2 < 2*365: #a <2 yr period isn't good anyway
+    if period1 < 2*365 or period2 < 2*365:
         return False
     # Check if the ratio is close to an integer or simple fraction
     if abs(ratio - round(ratio)) < tolerance:
@@ -127,19 +98,15 @@ def are_harmonics(period1, period2, tolerance=0.01):
     else:
         return False
     
-##################################################################################################################
-
-def get_harmonic_list(period, print_info=False):
+def get_harmonic_list(period, print=False):
     harmonics_list = []
     for i in range(len(period)):
         for j in range(i+1, len(period)):
             if are_harmonics(period[j], period[i], tolerance=0.01):
-                if print_info == True:
+                if print == True:
                     print(f"Period {period[i]} and {period[j]} are harmonics of each other")
                 harmonics_list.append([period[i], period[j]])
     return harmonics_list
-
-##################################################################################################################
 
 def periodogram_flagging(harmonics_list, period, period_err, peaks_power, plevels, t_span):
     '''
@@ -153,7 +120,9 @@ def periodogram_flagging(harmonics_list, period, period_err, peaks_power, plevel
     harmonics_list = list(np.unique(np.array(harmonics_list)))
     error = period_err/period * 100
     powers_close_max = [n for n in peaks_power if n > 0.9*np.max(peaks_power) and n != np.max(peaks_power)]
-
+    print("close powers",powers_close_max)
+    print("harmonics",harmonics_list)
+    print("tspan",t_span)
     if np.max(peaks_power) < plevels[-1] or period < 365 or period > 100*365:
         flag = "black"
     else:
@@ -168,16 +137,12 @@ def periodogram_flagging(harmonics_list, period, period_err, peaks_power, plevel
 
     return flag
 
-##################################################################################################################
-
 def gaps_time(BJD):
     '''Takes the BJD array and returns the 10 biggest gaps in time.'''
     time_sorted = BJD[np.argsort(BJD)] #sorting time
     gaps = np.diff(time_sorted)
     gaps = gaps[np.argsort(gaps)][-10:]
     return gaps
-
-##################################################################################################################
 
 def get_sign_gls_peaks(df_peaks, df_peaks_WF, gaps, fap1, atol_frac=0.1, verb=False, evaluate_gaps=False):
     """Get GLS significant peaks and excludes peaks close to window function peaks and to gaps in BJD."""
@@ -204,11 +169,10 @@ def get_sign_gls_peaks(df_peaks, df_peaks_WF, gaps, fap1, atol_frac=0.1, verb=Fa
 
     return np.sort(sel_peaks)
 
-##################################################################################################################
-
 #* GLS periodogram (Astropy):
-def gls(star, instr, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5, print_info = True, save=False, folder_path=None):
+def gls(star, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5):
     """Generalised Lomb-Scargle Periodogram using the `astropy` implementation.
+
     Args:
         x (array-like): Time coordinate.
         y (array-like): Y-coordinate.
@@ -230,9 +194,9 @@ def gls(star, instr, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5, print_info
             FAPS (ndarray): List of FAPs in the same order as periods and power
 
             power_win (ndarray): GLS power of window function at each period grid point.
-    """
-    x = x.dropna(); y = y.dropna(); y_err = y_err.dropna()
 
+    Ref: Zechmeister & Kürster (2009)
+    """
     x = np.asarray(x); y = np.asarray(y)
     t = max(x) - min(x); n = len(x)
 
@@ -243,7 +207,6 @@ def gls(star, instr, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5, print_info
     freq = np.linspace(fmin, fmax, int(steps))
     period = 1./freq
 
-    #get power from GLS
     gls = LombScargle(x, y, y_err)
     power = gls.power(freq)
 
@@ -271,49 +234,27 @@ def gls(star, instr, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5, print_info
     # window function:
     results['power_win'] = power_win
 
-    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(13, 4))
-    fig.suptitle(f"GLS Astropy periodogram for {star} I_CaII", fontsize=12)
-    axes[0].set_xlabel("Period [days]"); axes[0].set_ylabel("Power")
-    axes[0].semilogx(period, power, 'b-')
-    axes[0].set_title(f"Power vs Period for GLS Periodogram")
     plevels = [fap5,fap1]
-    for i in range(len(fap_levels)): # Add the FAP levels to the plot
-        axes[0].plot([min(period), max(period)], [plevels[i]]*2, '--',
-                label="FAP = %4.1f%%" % (fap_levels[i]*100))
-    axes[0].legend()
-    
-    T_span = t
 
     period_max = peaks_period[0]
     results["period_best"] = period_max
 
-    #params, stds = curve_fit_error(x,y, period_max)
-    #uncertainty = stds[-1]
+    plt.figure(5,figsize=(8,6))
+    ofac_array = np.linspace(1,50,50)
+    hifac_array = np.linspace(0.001,1,5)
+    for hifac in hifac_array:
+        error_list = []
+        for ofac in ofac_array:
+            e_f, Psin_err = PyAstronomy_error(x,y,power,ofac, hifac, freq=None)
+            error_list.append(Psin_err)
+        plt.plot(ofac_array,error_list,label=f"hifac = {hifac}")
+    plt.xlabel("ofac = oversampling factor of frequency grid")
+    plt.ylabel("Period error with PyAstronomy [days]")
+    plt.legend(title="hifac = maximum frequency")
+    
+    print(f"Error period with PyAstronomy: {Psin_err}")
+    results["std_period_best"] = Psin_err
 
-    e_f, Psin_err = PyAstronomy_error(x,y,power,freq)
-    uncertainty = Psin_err
-    #amplitude = params[0]
-    #amplitude_err = stds[0]
-    #phi = params[1]
-    #omega = params[2]
-    #results["amplitude_best"] = params[0]
-    #results["amplitude_err_best"] = stds[0]
-    results["std_period_best"] = uncertainty
-
-    x_grid = np.arange(min(x), max(x), 0.01)
-    #y_grid = amplitude * np.sin(2 * np.pi * x_grid/period_max + phi) + omega
-    def sin_model(x, a, phi, omega):
-        return a * np.sin(2 * np.pi * x/period_max + phi) + omega
-    p1, _ = curve_fit(sin_model, x, y)
-    y_grid = sin_model(x_grid, *p1)
-
-    axes[1].plot(x_grid, y_grid, 'b-')
-    axes[1].errorbar(x,y,yerr=y_err,fmt='.', color='k',label='data')
-    axes[1].set_xlabel('BJD $-$ 2450000 [days]'); axes[1].set_ylabel(r'$S_\mathrm{CaII}$')
-    axes[1].set_title("Fitting the data with GLS")
-    axes[1].legend()
-
-    #compute the Window Function parameters and significant peaks
     period_list_WF = period
     period_max_WF = period[np.argmax(power_win)]
     results["period_best_WF"] = period_max_WF
@@ -329,69 +270,35 @@ def gls(star, instr, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5, print_info
     gaps = gaps_time(x)
     sel_peaks = get_sign_gls_peaks(df_peaks, df_peaks_WF, gaps, fap1, atol_frac=0.1, verb=False, evaluate_gaps=False)
 
-    for peak in sel_peaks:
-        axes[0].axvline(peak, ls='--', lw=0.8, color='orange')
-    plt.tight_layout()
-    if save == True:
-        plt.savefig(folder_path+ f"{star}_GLS.pdf",bbox_inches="tight",)
-
-    fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(8, 5))
-    axes.set_xlabel("Period [days]"); axes.set_ylabel("Power")
-    axes.semilogx(period_list_WF, power_win, 'b-',label="WF")
-    axes.semilogx(period, power, 'r-',lw=0.7,label="data")
-    axes.set_title(f"Power vs Period for Astropy GLS Periodogram {star} Window Function")
-    for i in range(len(fap_levels)): # Add the FAP levels to the plot
-        axes.plot([min(period_list_WF), max(period_list_WF)], [plevels[i]]*2, '--',
-                label="FAP = %4.1f%%" % (fap_levels[i]*100))
-    for gap in gaps:
-        axes.axvline(gap, ls='--', lw=0.7, color='green')
-    axes.legend()
-    plt.tight_layout()
-    if save == True:
-        plt.savefig(folder_path+ f"{star}_GLS_WF.pdf",bbox_inches="tight",)
-
-    harmonics_list = get_harmonic_list(sel_peaks,print_info)
+    harmonics_list = get_harmonic_list(sel_peaks)
     period_err = results["std_period_best"]
-    flag = periodogram_flagging(harmonics_list, period_max, period_err, peaks_power, plevels, T_span)
-    
-    if print_info == True:
-        print("Gaps in BJD:", gaps)
-        print("Significant Peaks:", sel_peaks)
-        print("Flag: ", flag)
+    flag = periodogram_flagging(harmonics_list, period_max, period_err, peaks_power, plevels, t_span)
+    print("Flag: ",flag)
 
-    return results, gaps, flag, period_max, period_err, harmonics_list#, amplitude, amplitude_err
+    print(f"Period with astropy: {period_max} days")
 
-##################################################################################################################
+    pyastronomy_error = Psin_err
 
-def get_report_periodogram(dic,gaps,period,period_err,flag_period,harmonics_list,folder_path):
-    '''Writes into a txt file a report on the periodogram.'''
-    instr = dic["INSTR"]; star = dic["STAR_ID"]
-    t_span = dic["TIME_SPAN"]
-    snr_min = dic["SNR_MIN"]; snr_max = dic["SNR_MAX"]
-    n_spec = dic["I_CAII_N_SPECTRA"]
+    return results, gaps, flag, period_max, period_err, harmonics_list, pyastronomy_error
 
-    name_file = folder_path+f"report_periodogram_{star}.txt"
-    with open(name_file, "w") as f:
-        f.write("###"*30+"\n")
-        f.write("\n")
-        f.write("Periodogram Report\n")
-        f.write("---"*30+"\n")
-        f.write(f"Star: {star}\n")
-        f.write(f"Instrument: {instr}\n")
-        f.write(f"SNR: {snr_min} - {snr_max}\n")
-        f.write(f"Time Span: {t_span}\n")
-        f.write(f"Number of spectra: {n_spec}\n")
-        f.write("---"*30+"\n")
-        f.write(f"Period I_CaII: {period} +/- {period_err} days\n")
-        f.write(f"Period flag: {flag_period}\n")
-        #f.write(f"Amplitude I_CaII: {amplitude} +/- {amplitude_err}\n")
-        f.write(f"Harmonics: {harmonics_list}\n")
-        f.write(f"Time gaps between data points: {gaps}\n")
-        f.write("\n")
-        f.write("###"*30+"\n")
-    
-    f = open(name_file, 'r')
-    file_contents = f.read()
-    f.close()
+instr = "HARPS"
+stars = ["HD209100"]
 
-    return file_contents
+print(f"{stars[0]} with {instr} data")
+folder_path = f"teste_download_rv_corr/{stars[0]}/{stars[0]}_{instr}/"
+file_path = folder_path+f"df_stats_{stars[0]}.fits"
+df, hdr = read_bintable(file_path,print_info=False)
+
+t_span = max(df["bjd"])-min(df["bjd"])
+n_spec = len(df)
+
+if n_spec >= 50 and t_span >= 2*365:  #only compute periodogram if star has at least 30 spectra in a time span of at least 2 years
+
+    results, gaps, flag_period, period_max, period_err, harmonics_list, pyastronomy_error = gls(stars[0], df["bjd"]-2450000, df["I_CaII"], y_err=df["I_CaII_err"], pmin=1.5, pmax=1e4, steps=1e5)
+    df = pd.DataFrame(results)
+    df_sorted = df.sort_values(by='power', ascending=False)
+
+else: 
+    period = None; period_err = None 
+
+plt.show()

@@ -10,7 +10,7 @@ from periodogram_funcs import get_report_periodogram
 def PyAstronomy_error(t,y,power,freq=None):
     '''Period error estimation of the periodogram based on the GLS implementation by PyAstronomy.'''
     N = len(y)
-    if freq.all == None:
+    if freq == None:
         th = t - np.min(t)
         tbase = np.max(th)
         ofac = 10; hifac = 1 #default values in PyAstronomy
@@ -23,8 +23,12 @@ def PyAstronomy_error(t,y,power,freq=None):
     nf = len(freq)
 
     k = np.argmax(power)
+    print(k)
     # Maximum power
     pmax = power[k]
+    print(pmax)
+    print(1/freq[k])
+    
     # Get the curvature in the power peak by fitting a parabola y=aa*x^2
     if 1 < k < nf-2:
         # Shift the parabola origin to power peak
@@ -77,10 +81,11 @@ def VanderPlas_52(t,y,y_err,power,period,T_span,approximate=False):
 def curve_fit_error(x,y, period_max):
     '''Computes the error of the period obtained from periodogram by fitting a curve_fit restrained enough so that the period obtained
     is the same as from the periodogram.'''
-    def sin_model(x, a, phi, omega, period):
-        return a * np.sin(2 * np.pi * x/period + phi) + omega
+    def sin_model(x, a, phi, omega, m,period):
+        return a * np.sin(2 * np.pi * x/period + phi) + omega + m*x
     
-    bounds=((0, -np.inf, -np.inf, 0.99999*period_max), (np.inf, np.inf, np.inf, 1.00001*period_max))
+    #bounds=((0, -np.inf, -np.inf, 0.99999*period_max), (np.inf, np.inf, np.inf, 1.00001*period_max))
+    bounds = ((0, -np.inf, -np.inf, -np.inf, period_max-300), (np.inf, np.inf, np.inf, np.inf, period_max+300))
 
     p1, pcov1 = curve_fit(sin_model, x, y, bounds=bounds)
 
@@ -238,13 +243,16 @@ def gls(star, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5):
     uncertainty = VanderPlas_52(x,y,y_err,power,period,T_span, approximate=False)
     results["std_period_best"] = uncertainty
 
-    period_max = peaks_period[0]
+
+    period_max = 6000.336022177463#peaks_period[0]
     results["period_best"] = period_max
 
     params, stds = curve_fit_error(x,y, period_max)
     print(f"Period with curve_fit: {params[-1]} +/- {stds[-1]} days")
     print(f"Amplitude: {params[0]} +/- {stds[0]} ")
 
+    #print(1/(freq[(1/freq > 3200)]))
+    #e_f, Psin_err = PyAstronomy_error(x,y,power[(1/freq > 3500)],freq[(1/freq > 3500)])
     e_f, Psin_err = PyAstronomy_error(x,y,power,freq)
     print(f"Error period with PyAstronomy: {Psin_err}")
 
@@ -282,6 +290,7 @@ stars = ['HD209100', 'HD160691', 'HD115617', 'HD46375', 'HD22049', 'HD102365', '
         'HD16417', 'HD10647', 'HD13445', 'HD142A', 'HD108147', 'HD16141', 'HD179949', 'HD47536',
         'HD20794',"HD85512","HD192310"] 
 #stars = ["HD20794"]
+stars = ["HD209100"]
 
 VanderPlas_52_error_list = []; curve_fit_error_list = []; pyastronomy_error_list = []; flag_period_list = []
 
