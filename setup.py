@@ -9,5 +9,6 @@ setup(name = 'ACTINometer',
     keywords = ['astronomy', 'activity', 'fits', 'harps', 'espresso', 'uves', 'radial velocity', 'exoplanets'],
     packages=find_packages(),
     install_requires = ['numpy', 'pandas', 'astropy', 'matplotlib', 'scipy', 'astroquery', 'math', 'PyAstronomy',
-                        'pyrhk @ git+https://github.com/gomesdasilva/pyrhk.git@main#egg=pyrhk']
+                        'pyrhk @ git+https://github.com/gomesdasilva/pyrhk.git@main#egg=pyrhk',
+                        'ACTIN2 @ git+https://github.com/gomesdasilva/ACTIN2.git']
 )

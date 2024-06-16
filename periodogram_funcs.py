@@ -69,7 +69,7 @@ def VanderPlas_52(t,y,y_err,power,period,T_span,approximate=False):
 def PyAstronomy_error(t,y,power,freq=None):
     '''Period error estimation of the periodogram based on the GLS implementation by PyAstronomy.'''
     N = len(y)
-    if freq == None:
+    if isinstance(freq, np.ndarray) == False:
         th = t - np.min(t)
         tbase = np.max(th)
         ofac = 10; hifac = 1 #default values in PyAstronomy

@@ -73,7 +73,7 @@ from general_funcs import (read_fits, plot_line, stats_indice, plot_RV_indices, 
 from RV_correction_funcs import (get_rv_ccf,correct_spec_rv,flag_ratio_RV_corr)
 from periodogram_funcs import (gls,get_report_periodogram)
 
-from actin2 import ACTIN # type: ignore
+from ACTIN2.actin2.actin2 import ACTIN # type: ignore
 
 import warnings
 warnings.simplefilter('ignore', category=VerifyWarning)
@@ -170,10 +170,6 @@ def ACTINometer(stars, instruments, columns_df, indices, max_spectra, min_snr,do
 
     max_snr_instr = {"HARPS": 550,"ESPRESSO": 1000,"FEROS": 1000,"UVES": 550}  # max SNR to be used to avoid saturation
 
-    # to login into the ESO data base
-    eso.login(username_eso)
-    eso.ROW_LIMIT = -1
-
     for star_name in stars:
 
         gaiadr3 = get_gaiadr3(star_name)
@@ -203,11 +199,15 @@ def ACTINometer(stars, instruments, columns_df, indices, max_spectra, min_snr,do
         for instr in instruments:
 
             print(f"Processing and correcting the spectra by RV for {instr} instrument...")
-            df = pd.DataFrame(columns=columns_df)
+            df = pd.DataFrame()
 
             max_snr = max_snr_instr[instr]
             if download == True:
                 print(f"Downloading spectra from {instr} instrument...")
+
+                # to login into the ESO data base
+                eso.login(username_eso)
+                eso.ROW_LIMIT = -1
 
                 logger = logging.getLogger("individual Run")
                 logger.setLevel(logging.INFO)
@@ -239,7 +239,7 @@ def ACTINometer(stars, instruments, columns_df, indices, max_spectra, min_snr,do
                 os.mkdir(folder_path)
                 os.mkdir(folder_path + "ADP/")
 
-            data_array = []  # to plot th+e lines later
+            data_array = []  # to plot the lines later
             drv = 0.5  # step to search rv
 
             for file in files_tqdm:
@@ -279,7 +279,7 @@ def ACTINometer(stars, instruments, columns_df, indices, max_spectra, min_snr,do
 
                 headers = {"bjd": bjd,"file": file,"instr": instr,"rv": radial_velocity,"obj": star_name,"SNR": SNR,"RV_flag": flag_rv}
                 df_ind = actin.CalcIndices(spectrum, headers, indices).indices
-                df = df.append(pd.DataFrame([{**df_ind, **headers}]),ignore_index=True,sort=True)
+                df = df._append(pd.DataFrame([{**df_ind, **headers}]),ignore_index=True,sort=True)
 
             df.to_csv(folder_path + f"df_{star_name}_{instr}.csv", index=False)  # save before sigma clip
             

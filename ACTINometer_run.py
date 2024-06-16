@@ -5,7 +5,7 @@ stars = ["HD46375","HD22049","HD102365","HD1461","HD16417","HD10647","HD13445","
 
 stars = ["HD209100"]
 
-instruments = ["HARPS","ESPRESSO"]#,"UVES"] #instruments
+instruments = ["HARPS","ESPRESSO","UVES"] #instruments
 
 columns_df = ["I_CaII","I_CaII_err","I_CaII_Rneg", "I_Ha06","I_Ha06_err","I_Ha06_Rneg", "I_NaI","I_NaI_err","I_NaI_Rneg",
             "bjd","file","instr","rv","obj","SNR"]  # for df
