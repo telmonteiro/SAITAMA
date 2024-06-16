@@ -73,7 +73,7 @@ from general_funcs import (read_fits, plot_line, stats_indice, plot_RV_indices, 
 from RV_correction_funcs import (get_rv_ccf,correct_spec_rv,flag_ratio_RV_corr)
 from periodogram_funcs import (gls,get_report_periodogram)
 
-from ACTIN2.actin2.actin2 import ACTIN # type: ignore
+from actin2 import ACTIN # type: ignore
 
 import warnings
 warnings.simplefilter('ignore', category=VerifyWarning)
@@ -106,7 +106,8 @@ def get_adp_spec(eso, search_name,name_target, neglect_data, instrument="HARPS",
     name_target = name_target.replace(" ", "")
     print("Searching: ", search_name)
 
-    tbl_search = eso.query_surveys(instrument, target=search_name, box=box)
+    tbl_search = eso.query_surveys(surveys=instrument, target=search_name, box=box)
+    print(tbl_search)
 
     if tbl_search is None:
         return "None"
@@ -166,9 +167,9 @@ def get_adp_spec(eso, search_name,name_target, neglect_data, instrument="HARPS",
     return paths_download
 
 
-def ACTINometer(stars, instruments, columns_df, indices, max_spectra, min_snr,download, neglect_data, username_eso, download_path, final_path):
+def ACTINometer(stars, instruments, indices, max_spectra, min_snr,download, neglect_data, username_eso, download_path, final_path):
 
-    max_snr_instr = {"HARPS": 550,"ESPRESSO": 1000,"FEROS": 1000,"UVES": 550}  # max SNR to be used to avoid saturation
+    max_snr_instr = {"HARPS": 550,"ESPRESSO": 1000,"UVES": 550}  # max SNR to be used to avoid saturation
 
     for star_name in stars:
 
@@ -206,7 +207,7 @@ def ACTINometer(stars, instruments, columns_df, indices, max_spectra, min_snr,do
                 print(f"Downloading spectra from {instr} instrument...")
 
                 # to login into the ESO data base
-                eso.login(username_eso)
+                eso.login(username=username_eso, store_password=True)
                 eso.ROW_LIMIT = -1
 
                 logger = logging.getLogger("individual Run")
@@ -342,8 +343,6 @@ def ACTINometer(stars, instruments, columns_df, indices, max_spectra, min_snr,do
                     report_periodogram = get_report_periodogram(dic,gaps,period,period_err,flag_period,harmonics_list,folder_path)
                     print(report_periodogram)
                     plt.clf()
-                    #print(f"Period of I_CaII: {period} +/- {period_err} days")
-                    #print(f"Flag of periodogram: {flag_period}")
                 else:
                     period = 0
                     period_err = 0
@@ -359,7 +358,6 @@ def ACTINometer(stars, instruments, columns_df, indices, max_spectra, min_snr,do
 
                 cols += ["S_MW","log_Rhk","prot_n84","prot_m08","age_m08"]
                 stats_df = stats_indice(star_name, cols, df)
-                #print(stats_df)
                 stats_df.to_csv(folder_path + f"stats_{star_name}.csv")
 
                 file_path = folder_path + f"df_stats_{star_name}.fits" #save into the final fits file
@@ -386,14 +384,6 @@ def ACTINometer(stars, instruments, columns_df, indices, max_spectra, min_snr,do
 
             df, hdr = read_bintable(file_path)
             master_df = pd.concat([master_df, df], ignore_index=True)
-
-            #new_header = {}
-            #hdr_keys_to_use = ["TIME_SPAN","SNR_MIN","SNR_MAX","PERIOD_I_CaII","PERIOD_I_CaII_ERR","FLAG_PERIOD","FLAG_RV"]
-            #for key in hdr_keys_to_use:
-            #    new_header[f"{key}_{instr}"] = hdr[key]
-                
-            # Save updated headers in the master header
-            #master_header.update(new_header)
 
             # Convert the individual DataFrame to a FITS HDU and add it to the HDU list
             for col in df.columns:
