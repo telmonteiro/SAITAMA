@@ -21,6 +21,8 @@ For each instrument:
 - Saves the statistics and data frame in a fits file.
 Then it combines the fits file per instrument into a master fits file, recomputing the statistics and the periodogram with all the data points.
 
+
+
 Input parameters:
 - stars: object identifiers, preferentially in the HD catalogue. Must be in a list format
 - instruments: name of the spectrograph to retrieve the spectra from. Must be in a list format
@@ -74,3 +76,4 @@ sudo python setup.py install
 
 - correct eventual bugs
 - the sometimes odd results from UVES may deserve a more thorough analysis
+- in the near future a full report describing ACTINometer will be included
