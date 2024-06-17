@@ -10,5 +10,5 @@ setup(name = 'ACTINometer',
     packages=find_packages(),
     include_package_data=True,
     package_data={'': ['*.csv'],},
-    install_requires = ['numpy', 'pandas', 'astropy', 'matplotlib', 'scipy', 'astroquery', 'PyAstronomy',]
+    install_requires = ['numpy', 'pandas', 'astropy', 'matplotlib', 'scipy', 'astroquery', 'PyAstronomy', 'tqdm']
 )
