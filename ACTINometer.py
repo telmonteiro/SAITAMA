@@ -23,7 +23,6 @@ Then it combines the fits file per instrument into a master fits file, recomputi
 Input parameters:
 - stars: object identifiers, preferentially in the HD catalogue. Must be in a list format
 - instruments: name of the spectrograph to retrieve the spectra from. Must be in a list format
-- columns_df: columns to include in the final data frame. Must be in a list format
 - indices: spectral lines to compute the activity indices. Must be in a list format
 - max_spectra: maximum number of spectra to be downloaded
 - min_snr: minimum SNR to select the spectra. Must be in a float-like format
@@ -31,27 +30,24 @@ Input parameters:
 the pipeline would download the spectra to)
 - neglect_data: spectra to be manually neglected for whatever reason
 - username_eso: username in the ESO data base to download the data
+- download_path: folder to where download spectra
+- final_path: folder to save products of the pipeline
 
 Returns:
-- creates a folder teste_download_rv_corr/{star} where all the produced files are stored
+- creates a folder "{final_path}/{star}" where all the produced files are stored
 - For each instrument:
     - in the subfolder ADP/ the corrected fits files of the spectra are stored
     - {star}_{instrument}_{line}.pdf: plot of the spectra in said line (CaI, CaII H, CaII K, H$\alpha$, HeI, NaID1, NaID2 and FeII)
     - stats_{star}.csv: csv file with a data frame including statistical information like the star name, the indice name and the respective maximum, minimum, mean, median, 
     standard deviation, weighted mean, time span and number of spectra used for that indice
-    - df_{star}_{instrument}.csv: csv file with the data frame including the columns_df given as input
+    - df_{star}_{instrument}.csv: csv file with the data frame including the columns_df given as input before any processing
     - {star}_GLS.pdf and {star}_WF.pdf: plots of the periodogram of the CaII H&K indice and the respective Window Function
     - df_stats_{star}.fits: FITS file that includes the data frame given by df_{star}_{instrument}.csv in a BINTable format and includes the statistics given in stats_{star}.csv
     and informations regarding the periodogram in the header
     - report_periodogram_{star}.txt: txt file that contains a small report on the periodogram computed and the WF, as well as the harmonics
-    - flag_ratios_{instrument}.txt: adds to a txt file the names of the badly corrected spectra and the RV flag ratio
 - master_df_{target_save_name}.fits: FITS file that contains the information for each instrument separately plus a BINTable + Header for the combined data
 - {star}_GLS.pdf and {star}_WF.pdf: plots of the periodogram of the CaII H&K indice and the respective Window Function for the combined data
 - report_periodogram_{star}.txt: txt file that contains a small report on the periodogram computed and the WF, as well as the harmonics for the combined data
-
-Notes:
-- to run the RV correction a file containing a reference spectra is needed. I recommend using the Sun spectrum given along this pipeline, because the reading of this spectra is 
-adapted to it
 '''
 import os
 import glob
@@ -67,7 +63,7 @@ from astropy.io import fits
 from astropy.io.fits.verify import VerifyWarning
 from astropy.table import Table
 
-from get_spec_funcs import (get_gaiadr3, choose_snr, check_downloaded_data, select_best_spectra)
+from get_spec_funcs import (get_gaiadr3, choose_snr, select_best_spectra)
 from general_funcs import (read_fits, plot_line, stats_indice, plot_RV_indices, sigma_clip, instrument_fits_file, 
                            read_bintable, plot_RV_indices_diff_instr, get_calibrations_CaII)
 from RV_correction_funcs import (get_rv_ccf,correct_spec_rv,flag_ratio_RV_corr)
@@ -84,7 +80,7 @@ actin = ACTIN()
 global logger
 eso = Eso()
 
-def get_adp_spec(eso, search_name,name_target, neglect_data, instrument="HARPS", min_snr=10,max_snr=550, box=0.07, path_download_base="tmpdir_download4/", max_spectra=250):
+def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS", min_snr=10, max_snr=550, box=0.07, path_download_base="tmpdir_download/", max_spectra=250):
     """
     Downloads and processes spectra from ESO database.
 
@@ -107,7 +103,6 @@ def get_adp_spec(eso, search_name,name_target, neglect_data, instrument="HARPS",
     print("Searching: ", search_name)
 
     tbl_search = eso.query_surveys(surveys=instrument, target=search_name, box=box)
-    print(tbl_search)
 
     if tbl_search is None:
         return "None"
@@ -159,11 +154,9 @@ def get_adp_spec(eso, search_name,name_target, neglect_data, instrument="HARPS",
         eso.retrieve_data(tbl_ret, destination=path_download + "ADP/")
     else:
         # pass
-        table = tbl_search["ARCFILE"]
+        table = list(tbl_search["ARCFILE"])
         eso.retrieve_data(table, destination=path_download + "ADP/")
-
-    #snr_arr = check_downloaded_data(path_download + "ADP/")
-
+        
     return paths_download
 
 
@@ -281,6 +274,14 @@ def ACTINometer(stars, instruments, indices, max_spectra, min_snr,download, negl
                 headers = {"bjd": bjd,"file": file,"instr": instr,"rv": radial_velocity,"obj": star_name,"SNR": SNR,"RV_flag": flag_rv}
                 df_ind = actin.CalcIndices(spectrum, headers, indices).indices
                 df = df._append(pd.DataFrame([{**df_ind, **headers}]),ignore_index=True,sort=True)
+            
+            for ind in indices: #UVES does not cover CaII H&K so need to add empty columns for that indice
+                if ind not in df.columns:
+                    nan_array = np.empty((len(df),))
+                    nan_array[:] = np.nan
+                    df.insert(0, ind+"_err", nan_array)
+                    df.insert(0, ind+"_Rneg", nan_array)
+                    df.insert(0, ind, nan_array)
 
             df.to_csv(folder_path + f"df_{star_name}_{instr}.csv", index=False)  # save before sigma clip
             
@@ -288,6 +289,8 @@ def ACTINometer(stars, instruments, indices, max_spectra, min_snr,download, negl
 
             # if there are a lot of zero/negative fluxes in the window (>1%), discard for whatever indice
             for indice in indices:
+                if indice not in df.columns:
+                    continue
                 indice_Rneg = np.array(df[f"{indice}_Rneg"]) 
                 Rneg_bad_ind = np.where(indice_Rneg > 0.01)[0]
                 df = df.drop(labels=list(Rneg_bad_ind)) 
@@ -299,15 +302,6 @@ def ACTINometer(stars, instruments, indices, max_spectra, min_snr,download, negl
             flag_rv_ratio = N_good_spec / len(flag_col)
             bad_spec_indices = np.where(flag_col == 1)[0]
             df = df.drop(labels=list(bad_spec_indices)) #dropping the badly corrected spectra
-
-            #this part will be deleted in the final version of the pipeline
-            with open(f"flag_ratios_{instr}.txt", "w") as f:  #write in a text file the names of the badly corrected spectra and RV quality indicator flag
-                f.write("##########################\n")
-                f.write(f"Star: {star_name}\n")
-                f.write(f"Flag ratio: {flag_rv_ratio}\n")
-                if flag_rv_ratio != 1:
-                    for index in bad_spec_indices:
-                        f.write(f"Bad spectrum: {files[index]}\n")
 
             # plot the wavelength of known lines to check if RV correction is good
             for line in ["Ha", "CaIIH", "CaIIK", "FeII", "NaID1", "NaID2", "HeI", "CaI"]:
@@ -325,9 +319,10 @@ def ACTINometer(stars, instruments, indices, max_spectra, min_snr,download, negl
                 plot_RV_indices(star_name,df,indices,save=True,path_save=folder_path + f"{star_name}_{instr}.pdf")
                 plt.clf()
 
+                bjd = df["bjd"]
                 I_CaII = df["I_CaII"]
                 I_CaII_err = df["I_CaII_err"]
-                bjd = df["bjd"]
+
                 try:
                     t_span = max(bjd) - min(bjd)
                     n_spec = len(bjd)
@@ -337,10 +332,10 @@ def ACTINometer(stars, instruments, indices, max_spectra, min_snr,download, negl
                     snr_min = np.min(df["SNR"]); snr_max = np.max(df["SNR"])
                     dic = {"STAR_ID":star_name,"INSTR":instr,"TIME_SPAN":t_span,"SNR_MIN":snr_min,"SNR_MAX":snr_max,"I_CAII_N_SPECTRA":n_spec}
 
-                    # only compute periodogram if star has at least 30 spectra in a time span of at least 2 years
-                    results, gaps, flag_period, period, period_err, harmonics_list = gls(star_name, instr, bjd-2450000, I_CaII, y_err=I_CaII_err, 
+                    # only compute periodogram if star has at least 50 spectra in a time span of at least 2 years
+                    results, gaps, flag_period, period, period_err, harmonics_list, amplitude, amplitude_err = gls(star_name, instr, bjd-2450000, I_CaII, y_err=I_CaII_err, 
                                                                                              pmin=1.5, pmax=1e4, steps=1e5, print_info = False, save=True, folder_path=folder_path)
-                    report_periodogram = get_report_periodogram(dic,gaps,period,period_err,flag_period,harmonics_list,folder_path)
+                    report_periodogram = get_report_periodogram(dic,gaps,period,period_err,amplitude, amplitude_err,flag_period,harmonics_list,folder_path)
                     print(report_periodogram)
                     plt.clf()
                 else:
@@ -406,19 +401,25 @@ def ACTINometer(stars, instruments, indices, max_spectra, min_snr,download, negl
         plt.clf()
 
         snr_min = np.min(master_df["SNR"]); snr_max = np.max(master_df["SNR"])
-        I_CaII = master_df.dropna()["I_CaII"]; I_CaII_err = master_df.dropna()["I_CaII_err"]; bjd = master_df.dropna()["bjd"]
-        try:
-            t_span = max(bjd) - min(bjd)
-            n_spec_CaII = len(master_df["I_CaII"].dropna())
-        except:
-            n_spec_CaII = 0
+        print(master_df)
+        subset_df = master_df.dropna(subset=["I_CaII","I_CaII_err","bjd"])
+        print(subset_df)
+        bjd = subset_df["bjd"]
+        I_CaII = subset_df["I_CaII"]
+        I_CaII_err = subset_df["I_CaII_err"]
+        
+        t_span = max(bjd) - min(bjd)
+        n_spec_CaII = len(I_CaII)
+
         if n_spec_CaII >= 50 and t_span >= 2 * 365:
             dic = {"STAR_ID":star_name,"INSTR":list_instruments,"TIME_SPAN":t_span,"SNR_MIN":snr_min,"SNR_MAX":snr_max,"I_CAII_N_SPECTRA":n_spec_CaII}
 
-            # only compute periodogram if star has at least 30 spectra in a time span of at least 2 years
-            results, gaps, flag_period, period, period_err, harmonics_list = gls(star_name, instr, bjd-2450000, I_CaII, y_err=I_CaII_err, 
+            # only compute periodogram if star has at least 50 spectra in a time span of at least 2 years
+            results, gaps, flag_period, period, period_err, harmonics_list, amplitude, amplitude_err = gls(star_name, None, bjd-2450000, I_CaII, y_err=I_CaII_err, 
                                                                                     pmin=1.5, pmax=1e4, steps=1e5, print_info = False, save=True, folder_path=f"{final_path}/{star_name}/")
-            report_periodogram = get_report_periodogram(dic,gaps,period,period_err,flag_period,harmonics_list,folder_path=f"{final_path}/{star_name}/")
+            report_periodogram = get_report_periodogram(dic,gaps,period,period_err,flag_period, amplitude, amplitude_err, harmonics_list,folder_path=f"{final_path}/{star_name}/")
+            print(report_periodogram)
+            plt.clf()
         else:
             period = 0
             period_err = 0

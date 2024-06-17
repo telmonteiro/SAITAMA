@@ -146,7 +146,6 @@ def plot_RV_indices(star,df,indices,save, path_save):
     else: yerr = df.rv_err
     plt.errorbar(df.bjd - 2450000, df.rv, yerr, fmt='k.')
     plt.ylabel("RV [m/s]")
-    #print(indices)
     for i, index in enumerate(indices):
         plt.subplot(len(indices)+1, 1, i+2)
         plt.ylabel(index)
@@ -233,7 +232,6 @@ def plot_line(data, line, line_color=None,offset=0, line_legend="", lstyle = "-"
 
         wv = wv[wv_array]
         flux = flux[wv_array]
-        #flux_normalized = flux/np.linalg.norm(flux)
         if normalize == True:
             flux_normalized = flux/np.median(flux)#(flux-np.min(flux))/(np.max(flux)-np.min(flux))
         else: flux_normalized = flux
@@ -278,8 +276,6 @@ def instrument_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, perio
                 "PERIOD_I_CaII_ERR":[period_err,"Error of period of CaII activity index"],
                 "FLAG_PERIOD":[flag_period,"Goodness of periodogram fit flag. Color based."],
                 "FLAG_RV":[flag_rv_ratio,"Goodness of RV correction indicador. 1 = all good"],
-                #"AGE_M08":[age_m08,"Age Mamajek & Hillenbrand 2008"],
-                #"AGE_M08_ERR":[age_m08_err,"Error Age Mamajek & Hillenbrand 2008"],
                 "COMMENT":["Spectra based on SNR - time span trade-off","Comment"],
                 "COMMENT1":["RV obtained from CCF measure (m/s)","Comment"],
                 "COMMENT2":["3D data of wv (Angs) and flux of each spectrum","Comment"]}
@@ -295,9 +291,6 @@ def instrument_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, perio
             elif col == "N_spectra": comment = f"Nr of spectra used in {ind}"
             else: comment = f"{col} of {ind}"
             dict_hdr[ind.upper()+"_"+col.upper()] = [stat,comment]
-
-    #for keyword in dict_hdr.keys():
-    #    hdr.append(("HIERARCH "+keyword, dict_hdr[keyword][0], dict_hdr[keyword][1]), end=True)
 
     for keyword in dict_hdr.keys():
         value = dict_hdr[keyword][0]

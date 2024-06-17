@@ -287,24 +287,16 @@ def gls(star, instr, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5, print_info
     period_max = peaks_period[0]
     results["period_best"] = period_max
 
-    #params, stds = curve_fit_error(x,y, period_max)
-    #uncertainty = stds[-1]
-
     e_f, Psin_err = PyAstronomy_error(x,y,power,freq)
     uncertainty = Psin_err
-    #amplitude = params[0]
-    #amplitude_err = stds[0]
-    #phi = params[1]
-    #omega = params[2]
-    #results["amplitude_best"] = params[0]
-    #results["amplitude_err_best"] = stds[0]
     results["std_period_best"] = uncertainty
 
     x_grid = np.arange(min(x), max(x), 0.01)
     #y_grid = amplitude * np.sin(2 * np.pi * x_grid/period_max + phi) + omega
     def sin_model(x, a, phi, omega):
         return a * np.sin(2 * np.pi * x/period_max + phi) + omega
-    p1, _ = curve_fit(sin_model, x, y)
+    p1, cov1 = curve_fit(sin_model, x, y)
+    amplitude = p1[0]; amplitude_err = cov1[0]
     y_grid = sin_model(x_grid, *p1)
 
     axes[1].plot(x_grid, y_grid, 'b-')
@@ -333,7 +325,10 @@ def gls(star, instr, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5, print_info
         axes[0].axvline(peak, ls='--', lw=0.8, color='orange')
     plt.tight_layout()
     if save == True:
-        plt.savefig(folder_path+ f"{star}_GLS.pdf",bbox_inches="tight",)
+        if instr == None:
+            plt.savefig(folder_path+ f"{star}_GLS.pdf",bbox_inches="tight",)
+        else:
+            plt.savefig(folder_path+ f"{star}_{instr}_GLS.pdf",bbox_inches="tight",)
 
     fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(8, 5))
     axes.set_xlabel("Period [days]"); axes.set_ylabel("Power")
@@ -348,7 +343,10 @@ def gls(star, instr, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5, print_info
     axes.legend()
     plt.tight_layout()
     if save == True:
-        plt.savefig(folder_path+ f"{star}_GLS_WF.pdf",bbox_inches="tight",)
+        if instr == None:
+            plt.savefig(folder_path+ f"{star}_GLS_WF.pdf",bbox_inches="tight",)
+        else:
+            plt.savefig(folder_path+ f"{star}_{instr}_GLS_WF.pdf",bbox_inches="tight",)
 
     harmonics_list = get_harmonic_list(sel_peaks,print_info)
     period_err = results["std_period_best"]
@@ -359,11 +357,11 @@ def gls(star, instr, x, y, y_err=None, pmin=1.5, pmax=1e4, steps=1e5, print_info
         print("Significant Peaks:", sel_peaks)
         print("Flag: ", flag)
 
-    return results, gaps, flag, period_max, period_err, harmonics_list#, amplitude, amplitude_err
+    return results, gaps, flag, period_max, period_err, harmonics_list, amplitude, amplitude_err
 
 ##################################################################################################################
 
-def get_report_periodogram(dic,gaps,period,period_err,flag_period,harmonics_list,folder_path):
+def get_report_periodogram(dic, gaps, period, period_err, amplitude, amplitude_err, flag_period, harmonics_list, folder_path):
     '''Writes into a txt file a report on the periodogram.'''
     instr = dic["INSTR"]; star = dic["STAR_ID"]
     t_span = dic["TIME_SPAN"]
@@ -384,7 +382,7 @@ def get_report_periodogram(dic,gaps,period,period_err,flag_period,harmonics_list
         f.write("---"*30+"\n")
         f.write(f"Period I_CaII: {period} +/- {period_err} days\n")
         f.write(f"Period flag: {flag_period}\n")
-        #f.write(f"Amplitude I_CaII: {amplitude} +/- {amplitude_err}\n")
+        f.write(f"Amplitude I_CaII: {amplitude} +/- {amplitude_err}\n")
         f.write(f"Harmonics: {harmonics_list}\n")
         f.write(f"Time gaps between data points: {gaps}\n")
         f.write("\n")
