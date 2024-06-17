@@ -21,7 +21,7 @@ For each instrument:
 - Saves the statistics and data frame in a fits file.
 Then it combines the fits file per instrument into a master fits file, recomputing the statistics and the periodogram with all the data points.
 
-
+A schematic flow-chart of the pipeline can be seen in ACTINometer_FlowChart.pdf.
 
 Input parameters:
 - stars: object identifiers, preferentially in the HD catalogue. Must be in a list format
