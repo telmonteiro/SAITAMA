@@ -68,6 +68,7 @@ HD47536 was particularly chosen because it has a low number of spectra available
 - Then, in the directory of ACTINometer, the user runs
   
 pip install -r requirements.txt
+
 sudo python setup.py install
 
 - Finally, to run ACTINometer, one can use the file ACTINometer_run.py, where the user can change the input parameters.
