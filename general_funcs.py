@@ -358,7 +358,7 @@ def plot_RV_indices_diff_instr(star, df, indices, save, path_save):
 
 ##################################
 
-def get_calibrations_CaII(star_gaia_dr3,I_CaII,I_CaII_err):
+def get_calibrations_CaII(star_gaia_dr3, instrument, I_CaII,I_CaII_err):
     '''Function to convert the I_CaII indice to Mount-Wilson index S_MW and to log R'_HK using the B-V color.
     Also computes if possible the rotation period with two different calibrations and the chromospheric age.
     Uses functions from the https://github.com/gomesdasilva/pyrhk/tree/master repository.
@@ -376,7 +376,9 @@ def get_calibrations_CaII(star_gaia_dr3,I_CaII,I_CaII_err):
     '''
 
     #converting to Mount-Wilson index S_MW
-    smw, smw_err = calc_smw(caii=I_CaII, caii_err=I_CaII_err, instr="HARPS_GDS21")
+    if instrument == "ESPRESSO": instr = "ESPRESSO"
+    else: instr="HARPS_GDS21"
+    smw, smw_err = calc_smw(caii=I_CaII, caii_err=I_CaII_err, instr=instr)
     smw = smw.astype(float); smw_err = smw_err.astype(float)
 
     #get Teff from SWEET-Cat

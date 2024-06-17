@@ -343,7 +343,7 @@ def ACTINometer(stars, instruments, indices, max_spectra, min_snr,download, negl
                     period_err = 0
                     flag_period = "white"
 
-                smw, smw_err, log_rhk, log_rhk_err, prot_n84, prot_n84_err, prot_m08, prot_m08_err, age_m08, age_m08_err = get_calibrations_CaII(star_gaia_dr3,I_CaII,I_CaII_err)
+                smw, smw_err, log_rhk, log_rhk_err, prot_n84, prot_n84_err, prot_m08, prot_m08_err, age_m08, age_m08_err = get_calibrations_CaII(star_gaia_dr3,instr,I_CaII,I_CaII_err)
 
                 new_cols_name = ["S_MW","S_MW_err","log_Rhk","log_Rhk_err","prot_n84","prot_n84_err","prot_m08","prot_m08_err","age_m08","age_m08_err"]
                 new_cols = [smw,smw_err,log_rhk,log_rhk_err,prot_n84,prot_n84_err,prot_m08,prot_m08_err,age_m08,age_m08_err]
