@@ -77,3 +77,4 @@ sudo python setup.py install
 - correct eventual bugs
 - the sometimes odd results from UVES may deserve a more thorough analysis
 - in the near future a full report describing ACTINometer will be included
+- no UVES calibration to obtain S_MW
