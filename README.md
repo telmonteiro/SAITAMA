@@ -45,7 +45,7 @@ Returns:
     standard deviation, weighted mean, time span and number of spectra used for that indice
     - df_{star}_{instrument}.csv: csv file with the data frame including the columns_df given as input before any processing
     - {star}\_GLS.pdf and {star}_WF.pdf: plots of the periodogram of the CaII H&K indice and the respective Window Function
-    - df_stats\_{star}.fits: FITS file that includes the data frame given by df_{star}_{instrument}.csv in a BINTable format and includes the statistics given in stats_{star}.csv
+    - df_stats\_{star}.fits: FITS file that includes the data frame given by df\_{star}\_{instrument}.csv in a BINTable format and includes the statistics given in stats_{star}.csv
     and informations regarding the periodogram in the header
     - report\_periodogram\_{star}.txt: txt file that contains a small report on the periodogram computed and the WF, as well as the harmonics
 - master_df_{target_save_name}.fits: FITS file that contains the information for each instrument separately plus a BINTable + Header for the combined data
