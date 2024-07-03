@@ -45,7 +45,7 @@ Returns:
     standard deviation, weighted mean, time span and number of spectra used for that indice
     - df_{star}_{instrument}.csv: csv file with the data frame including the columns_df given as input before any processing
     - {star}\_GLS.pdf and {star}_WF.pdf: plots of the periodogram of the CaII H&K indice and the respective Window Function
-    - df_stats\_{star}.fits: FITS file that includes the data frame given by df_{star}_{instrument}.csv in a BINTable format and includes the statistics given in stats_{star}.csv
+    - df_stats\_{star}.fits: FITS file that includes the data frame given by df\_{star}\_{instrument}.csv in a BINTable format and includes the statistics given in stats_{star}.csv
     and informations regarding the periodogram in the header
     - report\_periodogram\_{star}.txt: txt file that contains a small report on the periodogram computed and the WF, as well as the harmonics
 - master_df_{target_save_name}.fits: FITS file that contains the information for each instrument separately plus a BINTable + Header for the combined data
@@ -62,12 +62,13 @@ HD47536 was particularly chosen because it has a low number of spectra available
 
 ## Running the pipeline
 
-- To run this pipeline, the user first needs to download and install the ACTIN2 tool (https://github.com/gomesdasilva/ACTIN2), so it can be accessed as a package. Other dependencies include:
+- To run this pipeline, the user first needs to download and install the ACTIN2 tool (https://github.com/gomesdasilva/ACTIN2), so it can be accessed as a package. Please keep in mind that the csv table in the ACTIN2 repository may not be downloaded and needed to be manually included. Other dependencies include:
   - numpy==1.26.4, pandas==1.5.3, astropy==6.1.0, matplotlib==3.9.0, scipy==1.13.1, astroquery==0.4.7, PyAstronomy==0.21.0, tqdm==4.66.1.
 - The versions above are the ones used to code and run the pipeline, not mandatory. The Python version used was 3.10.12, ran inside WSL Ubuntu with VsCode.
 - Then, in the directory of ACTINometer, the user runs
   
 pip install -r requirements.txt
+
 sudo python setup.py install
 
 - Finally, to run ACTINometer, one can use the file ACTINometer_run.py, where the user can change the input parameters.
@@ -77,4 +78,3 @@ sudo python setup.py install
 - correct eventual bugs
 - the sometimes odd results from UVES may deserve a more thorough analysis
 - in the near future a full report describing ACTINometer will be included
-- no UVES calibration to obtain S_MW
