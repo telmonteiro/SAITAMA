@@ -1,8 +1,8 @@
-# ACTINometer - a pipeline for the derivation of spectral activity indices for stars with exoplanets
+# SAITAMA - a pipeline for the derivation of spectral activity indices for stars with exoplanets
 
 This repository's aim is to track the work done in the PEEC "The stellar activity in stars with exoplanets", made in 2024.
 
-This pipeline uses the ACTIN tool (2018JOSS....3..667G and 2021A&A...646A..77G) that computes the spectral activity indices for a stellar spectrum. The objective is to apply ACTIN on the most stars possible from the SWEET-Cat catalogue (2021A&A...656A..53S), which contains the stars with exoplanets and respective stellar parameters. The spectral activity indices chosen in this pipeline are the CaII H&K, the H$\alpha$ 0.6 A and the NaI lines.
+SAITAMA (Stellar ActivITy AuToMatic cAlculator) uses the ACTIN tool (2018JOSS....3..667G and 2021A&A...646A..77G) that computes the spectral activity indices for a stellar spectrum. The objective is to apply ACTIN on the most stars possible from the SWEET-Cat catalogue (2021A&A...656A..53S), which contains the stars with exoplanets and respective stellar parameters. The spectral activity indices chosen in this pipeline are the CaII H&K, the H$\alpha$ 0.6 A and the NaI lines.
 
 ## Description of the pipeline
 
@@ -21,7 +21,7 @@ For each instrument:
 - Saves the statistics and data frame in a fits file.
 Then it combines the fits file per instrument into a master fits file, recomputing the statistics and the periodogram with all the data points.
 
-A schematic flow-chart of the pipeline can be seen in ACTINometer_FlowChart.pdf.
+A schematic flow-chart of the pipeline can be seen in SAITAMA_FlowChart.pdf.
 
 Input parameters:
 - stars: object identifiers, preferentially in the HD catalogue. Must be in a list format
