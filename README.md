@@ -65,16 +65,10 @@ HD47536 was particularly chosen because it has a low number of spectra available
 - To run this pipeline, the user first needs to download and install the ACTIN2 tool (https://github.com/gomesdasilva/ACTIN2), so it can be accessed as a package. Please keep in mind that the csv table in the ACTIN2 repository may not be downloaded and needed to be manually included. Other dependencies include:
   - numpy==1.26.4, pandas==1.5.3, astropy==6.1.0, matplotlib==3.9.0, scipy==1.13.1, astroquery==0.4.7, PyAstronomy==0.21.0, tqdm==4.66.1.
 - The versions above are the ones used to code and run the pipeline, not mandatory. The Python version used was 3.10.12, ran inside WSL Ubuntu with VsCode.
-- Then, in the directory of ACTINometer, the user runs
+- Then, in the directory of SAITAMA, the user runs
   
 pip install -r requirements.txt
 
 sudo python setup.py install
 
-- Finally, to run ACTINometer, one can use the file ACTINometer_run.py, where the user can change the input parameters.
-
-## Problems and future work
-
-- correct eventual bugs
-- the sometimes odd results from UVES may deserve a more thorough analysis
-- in the near future a full report describing ACTINometer will be included
+- Finally, to run SAITAMA, one can use the file SAITAMA_run.py, where the user can change the input parameters.
