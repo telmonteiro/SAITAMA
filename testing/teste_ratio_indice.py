@@ -1,187 +1,176 @@
 import numpy as np, pandas as pd, matplotlib.pylab as plt, os, glob
-from util_funcs import read_fits, plot_line
+from pipeline_functions.general_funcs import read_fits, plot_line
 
-def line_ratio_indice(data, line="CaI"):
+def get_alphaRV(data, line="CaI"):
     '''
-    Computes a ratio between the continuum and line flux of a reference line to check if everything is alright.
+    Computes alphaRV, the ratio between the continuum and the center of the line fluxes of a reference line.
+    The line chosen is CaI.
     '''
     lines_list = {"CaIIK":3933.664,"CaIIH":3968.47,"Ha":6562.808,"NaID1":5895.92,"NaID2":5889.95,"HeI":5875.62,"CaI":6572.795,"FeII":6149.240}
     line_wv = lines_list[line]
     
     if line in ["CaIIK","CaIIH"]: window = 12
-    elif line in ["Ha","NaID1","NaID2"]: window = 2
-    else: window = 0.6
+    elif line in ["Ha","NaID1","NaID2"]: window = 22
+    else: window = 0.7
 
-    ratio_arr = np.zeros(len(data)); center_flux_line_arr = np.zeros(len(data)); flux_continuum_arr = np.zeros(len(data)) 
+    alpha_RV = np.zeros(len(data)); center_flux_line_arr = np.zeros(len(data)); flux_continuum_arr = np.zeros(len(data)) 
 
     for i in range(len(data)):
         wv = data[i][0]; flux = data[i][1]
+
         wv_array = np.where((line_wv-window < wv) & (wv < line_wv+window))
         wv = wv[wv_array]
         flux = flux[wv_array]
-        #flux_normalized = flux/np.linalg.norm(flux)
-        flux_normalized = (flux-np.min(flux))/(np.max(flux)-np.min(flux))
 
-        flux_left = np.median(flux_normalized[:20])
-        flux_right = np.median(flux_normalized[:-20])
-        flux_continuum = np.median([flux_left,flux_right]) #median
-        #print("Flux continuum: ",flux_continuum)
+        flux_normalized = flux/np.median(flux)
+
+        flux_left_ind = np.where((wv > line_wv-window) & (wv < line_wv - window + 0.2))
+        flux_right_ind = np.where((wv < line_wv+window) & (wv > line_wv + window - 0.2))
+        flux_left = np.median(flux_normalized[flux_left_ind])
+        flux_right = np.median(flux_normalized[flux_right_ind])
+
+        flux_continuum = np.median([flux_left,flux_right])
         
-        wv_center_line = np.where((line_wv-window/30 < wv) & (wv < line_wv+window/30))
+        wv_center_line = np.where((line_wv-0.03 < wv) & (wv < line_wv+0.03))
         flux_line = flux_normalized[wv_center_line]
         center_flux_line = np.median(flux_line)
-        #print("Flux center line: ",center_flux_line)
 
-        ratio = center_flux_line/flux_continuum 
+        ratio_fluxes = center_flux_line/flux_continuum 
 
-        ratio_arr[i] = ratio
+        alpha_RV[i] = ratio_fluxes
         center_flux_line_arr[i] = center_flux_line
         flux_continuum_arr[i] = flux_continuum
          
-    return ratio_arr, center_flux_line_arr, flux_continuum_arr
+    return alpha_RV, center_flux_line_arr, flux_continuum_arr
 
 
-def flag_ratio_RV_corr(files,instr):
+def get_betaRV(files,instr):
     '''
-    For each spectrum, run an interval of offsets and if the minimum ratio is not in [-0.02,0.02], raises a flag = 1.
-    Flag = 0 is for good spectra. Then the flag ratio #0/#total is computed
+    Computes beta_RV, as an overall quality indicator of the RV correction. 
+    For each spectrum, the algorithm runs an interval of offsets and if the minimum alpha_RV (ratio between the continuum and the center
+    of the line fluxes) is not in the interval [-0.03,0.03] Angstrom, then gamma_RV (binary flag) = 1 for that spectrum. 
+    Otherwise, gamma_RV = 0.
+    beta_RV is then the ratio between the number of spectra with flag = 0 and the total number of spectra:
+    - beta_RV = 1 means that all of the spectra was well corrected.
+    - beta_RV = 0 means that none of the spectra was well corrected.
     '''
-    offset_list = np.linspace(-1,1,1001)
-    flag_list = np.zeros((len(files)))
+    offset_list = np.linspace(-1,1,501)
+    gamma_RV_arr = np.zeros((len(files)))
 
     for i,file in enumerate(files):
-        wv, flux, flux_err, hdr = read_fits(file,instrument=instr,mode="rv_corrected")
-        #if i == 0: wv += 0.2 #just to fake a bad spectrum
-        ratio_list = np.zeros_like(offset_list)
+        wv, flux, _, _ = read_fits(file,instrument=instr,mode="rv_corrected")
+
+        alpha_RV_arr = np.zeros_like(offset_list)
         for j,offset in enumerate(offset_list):
-            ratio_arr, center_flux_line_arr, flux_continuum_arr = line_ratio_indice([(wv+offset,flux)], line="CaI")
-            ratio_list[j]=ratio_arr
+            alpha_RV, _, _ = get_alphaRV([(wv+offset,flux)], line="CaI")
+            alpha_RV_arr[j]=alpha_RV[0]
 
-        min_ratio_ind = np.argmin(ratio_list)
+        min_ratio_ind = np.argmin(alpha_RV_arr)
         offset_min = offset_list[min_ratio_ind]
-        #print(offset_min)
-        if offset_min < -0.05 or offset_min > 0.05:
-            flag_list[i] = 1
-        else: flag_list[i] = 0
 
-    good_spec_ind = np.where((flag_list == 0))
-    N_good_spec = len(flag_list[good_spec_ind])
-    flag_ratio = N_good_spec / len(flag_list)
+        if offset_min < -0.03 or offset_min > 0.03:
+            gamma_RV_arr[i] = 1
+        else: gamma_RV_arr[i] = 0
 
-    return flag_ratio, flag_list
+    good_spec_ind = np.where((gamma_RV_arr == 0))
+    N_good_spec = len(gamma_RV_arr[good_spec_ind])
+    beta_RV = N_good_spec / len(gamma_RV_arr)
 
+    return beta_RV, gamma_RV_arr
 
-#target_save_name = "HD108147" #a linha do CaI está um caos, mas as do CaII H&K e Halpha estao ok?
-#instr = "HARPS"
+instr = "HARPS"
 target_save_name="HD209100"
-instr="ESPRESSO"
-files = glob.glob(os.path.join(f"teste_download_rv_corr/{target_save_name}/{target_save_name}_{instr}/ADP", "ADP*.fits"))
+files = glob.glob(os.path.join(f"/home/telmo/PEEC-24-main/pipeline_products/{target_save_name}/{target_save_name}_{instr}/ADP", "ADP*.fits"))
 
-'''
-#spectrum with highest ratio
-wv, flux, hdr = read_fits(files[21],instrument=instr,mode="rv_corrected") 
-plt.figure(7)
-ratio_arr, center_flux_line_arr, flux_continuum_arr = line_ratio_indice([(wv,flux)], line="CaI")
-print("Ratio: ",ratio_arr[0])
-print("Flux center line: ",center_flux_line_arr[0])
-plot_line(data=[(wv,flux)], line="CaI",lstyle="-")
-plt.axhline(y=center_flux_line_arr,xmin=0,xmax=1,ls="--",ms=0.2)
-plt.axhline(y=flux_continuum_arr,xmin=0,xmax=1,ls="--",ms=0.2)
-plt.title("Spectrum nr 21, highest ratio")
-'''
-#first spectrum
-wv, flux, flux_err, hdr = read_fits(files[4],instrument=instr,mode="rv_corrected")
+#Plot the first spectrum of the star given, with the regions that matter highlighted.
+wv, flux, flux_err, hdr = read_fits(files[0],instrument=instr,mode="rv_corrected")
+alpha_RV, center_flux_line_arr, flux_continuum_arr = get_alphaRV([(wv,flux)], line="CaI")
+print(f"For one spectrum:\n Ratio: {alpha_RV[0]}\n Flux center line: {center_flux_line_arr[0]}\n Flux continuum: {flux_continuum_arr[0]}")
+print("#"*20)
 plt.figure(1)
-ratio_arr, center_flux_line_arr, flux_continuum_arr = line_ratio_indice([(wv,flux)], line="CaI")
-print("Ratio: ",ratio_arr[0])
-print("Flux center line: ",center_flux_line_arr[0])
-plot_line(data=[(wv,flux)], line="CaI",lstyle="-")
-plt.axhline(y=center_flux_line_arr,xmin=0,xmax=1,ls="--",ms=0.2)
-plt.axhline(y=flux_continuum_arr,xmin=0,xmax=1,ls="--",ms=0.2)
-plt.title("Spectrum nr 0")
-'''
-#plot line to see it displaced
+plot_line(data=[(wv,flux)], line="CaI",lstyle="-",line_color="black")
+plt.axhline(y=center_flux_line_arr,xmin=0,xmax=1,ls="--",ms=0.2,c="red")
+plt.axhline(y=flux_continuum_arr,xmin=0,xmax=1,ls="--",ms=0.2,c="red")
+line_wv = 6572.795; window = 0.7
+wv_array = np.where((line_wv-window < wv) & (wv < line_wv+window))
+wv1 = wv[wv_array]
+flux1 = flux[wv_array]
+flux_normalized = flux1/np.median(flux1)
+plt.fill_betweenx(y=[np.min(flux_normalized),np.max(flux_normalized)], x1=line_wv-window, x2=line_wv - window + 0.2, alpha=0.15,color="blue")
+plt.fill_betweenx(y=[np.min(flux_normalized),np.max(flux_normalized)], x1=line_wv + window - 0.2, x2=line_wv + window, alpha=0.15,color="blue")
+plt.fill_betweenx(y=[np.min(flux_normalized),np.max(flux_normalized)], x1=line_wv-0.03, x2=line_wv+0.03,alpha=0.15,color="orange")
+plt.savefig("CaI_line_alpha_RV.pdf",bbox_inches="tight")
+
+#Plot that first spectra three times, one in the original position and the other two shifted in wavelength.
+offset_list = np.linspace(-0.1,0.1,3)
 plt.figure(2)
-offset_list = np.linspace(-0.2,0.2,3)
 for offset in offset_list:
     plot_line(data=[(wv+offset,flux)], line="CaI",lstyle="-")
-plt.title("Offsetting the spectrum nr 0 by 0.2 and -0.2 Angs")
-'''
-#plot offset vs ratio
-#wv += 0.2
-offset_list = np.linspace(-1,1,1001)
-ratio_list = np.zeros_like(offset_list)
-for i,offset in enumerate(offset_list):
-    ratio_arr, center_flux_line_arr, flux_continuum_arr = line_ratio_indice([(wv+offset,flux)], line="CaI")
-    ratio_list[i]=ratio_arr
-plt.figure(3)
-plt.plot(offset_list,ratio_list)
-plt.axvline(x=0,ymin=0,ymax=1,ls="-",ms=0.1)
-plt.axvline(x=0.05,ymin=0,ymax=1,ls="--",ms=0.1)
-plt.axvline(x=-0.05,ymin=0,ymax=1,ls="--",ms=0.1)
-plt.xlabel(r"Offset ($\lambda$)"); plt.ylabel("Ratio (Center of line / Continuum)")
+plt.title("Offsetting spectrum by 0.2 and -0.2 Angs")
+plt.savefig("CaI_offset_2.pdf",bbox_inches="tight")
 
-#plot offset vs I_CaII
-#wv -= 0.2
-from actin2.actin2 import ACTIN
+#Plot alpha_RV as a function of the offset in wavelength.
+offset_list = np.linspace(-0.1,0.1,201)
+alpha_RV_arr = np.zeros_like(offset_list)
+for i,offset in enumerate(offset_list):
+    alpha_RV, center_flux_line_arr, flux_continuum_arr = get_alphaRV([(wv+offset,flux)], line="CaI")
+    alpha_RV_arr[i]=alpha_RV[0]
+plt.figure(3)
+plt.plot(offset_list,alpha_RV_arr)
+plt.axvline(x=0,ymin=0,ymax=1,ls="-",ms=0.1,c="black")
+plt.axvline(x=0.03,ymin=0,ymax=1,ls="--",ms=0.1,c="red")
+plt.axvline(x=-0.03,ymin=0,ymax=1,ls="--",ms=0.1,c="red")
+plt.xlabel(r"Offset ($\lambda$)"); plt.ylabel(r"$\alpha_{RV}$")
+plt.savefig("alpha_RV_vs_offset.pdf",bbox_inches="tight")
+
+#Plot the I_CaII activity indice from ACTIN as a function of the offset in wavelength
+from actin2 import ACTIN
 actin = ACTIN()
 indices= ['I_CaII', 'I_Ha06', 'I_NaI']
 headers = {}
-offset_list = np.linspace(-1,1,101)
-ICaII = np.zeros_like(offset_list)
-ICaII_err = np.zeros_like(offset_list)
+offset_list = np.linspace(-0.1,0.1,101)
+ICaII = np.zeros_like(offset_list); ICaII_err = np.zeros_like(offset_list)
 for i,offset in enumerate(offset_list):
     spectrum = dict(wave=wv+offset, flux=flux)
     df_ind = actin.CalcIndices(spectrum, headers, indices).indices
     ICaII[i] = df_ind["I_CaII"]
     ICaII_err[i] = df_ind["I_CaII_err"]
+    if offset == 0.03:
+        offset_03 = ICaII[i]
+        print(f"I_CaII at offset = 0.03: {offset_03}")
+    elif offset == -0.03:
+        offset__03 = ICaII[i]
+        print(f"I_CaII at offset = -0.03: {offset__03}")
+    elif offset == 0:
+        offset_0 = ICaII[i]
+        print(f"I_CaII at offset = 0: {offset_0}")
+mean_offset = offset_0 - np.mean(np.array([offset_03,offset__03]))
+print("Mean difference for offset 0.03: ",mean_offset)
 plt.figure(4)
 plt.errorbar(offset_list,ICaII,yerr=ICaII_err)
-plt.xlabel(r"Offset ($\lambda$)"); plt.ylabel(r"$S_{CaII}$")
+plt.xlabel(r"Offset ($\lambda$)"); plt.ylabel(r"$I_{CaII}$")
+plt.axvline(x=0.03,ymin=0,ymax=1,ls="--",ms=0.2,c="red")
+plt.hlines(y=offset__03,xmin=-0.03,xmax=0,ls="-",lw=1.4,color="red")
+plt.axvline(x=-0.03,ymin=0,ymax=1,ls="--",ms=0.2,c="red")
+plt.hlines(y=offset_03,xmin=0,xmax=0.03,ls="-",lw=1.4,color="red")
+plt.axvline(x=-0,ymin=0,ymax=1,ls="--",ms=0.2,c="black")
+plt.savefig("I_CaII_vs_offset.pdf",bbox_inches="tight")
 
-
-#flag maker: for each spectrum, run an interval of offsets and if the minimum ratio is not in [-0.02,0.02], raises a flag
+#Plot an histogram of gamma_RV for each spectrum. 
 plt.figure(5)
-flag_ratio, flag_list = flag_ratio_RV_corr(files,instr)
-plt.hist(flag_list, bins=[-0.5, 0.5, 1.5], rwidth=0.8, align='mid', color='skyblue', edgecolor='black')
-plt.ylabel("# Spectra"); plt.xlabel("Flag (0 is good)")
+beta_RV, gamma_RV_arr = get_betaRV(files,instr)
+plt.hist(gamma_RV_arr, bins=[-0.5, 0.5, 1.5], rwidth=0.8, align='mid', color='skyblue', edgecolor='black')
+plt.ylabel("# Spectra"); plt.xlabel(r"$\gamma_{RV}$")
 plt.xticks([0, 1])
 plt.grid(axis='y')
-print("Flag ratio: ",flag_ratio)
-print(flag_list)
+print(r"$\beta_{RV}$: ",beta_RV)
+plt.savefig("beta_RV_histogram.pdf",bbox_inches="tight")
 
-'''
-# Write to a text file
-with open(f"flag_ratios_{instr}.txt", "w") as file:
-    file.write("##########################\n")
-    file.write(f"Star: {target_save_name}\n")
-    file.write(f"Flag ratio: {flag_ratio}\n")
-
-    if flag_ratio == 1:
-        file.write("Bad spectrum: None\n")
-    else:
-        bad_spec_indices = np.where(flag_list == 1)[0]
-        for index in bad_spec_indices:
-            file.write(f"Bad spectrum: {files[index]}\n")
-
-'''
-'''
-plt.figure(6)
-#plot spectrum vs ratio (all files)
-ratio_list = []
-for i,file in enumerate(files):
-    wv, flux, hdr = read_fits(file,instrument=instr,mode="rv_corrected")
-    #if i == 0: wv += 0.2
-    ratio_arr, center_flux_line_arr, flux_continuum_arr = line_ratio_indice([(wv,flux)], line="CaI")
-    ratio_list.append(ratio_arr[0])
-plt.scatter(np.arange(0,len(files)),ratio_list)
-plt.xlabel("Spectra"); plt.ylabel("Ratio (Center of line / Continuum)")
-'''
 plt.show()
+
 '''
-'''
-'''
-Plots the line, CaI, and computes the median of the first and last 20 points. then it takes the median of both values and that is considered the continuum flux
+Plots the line, CaI, and computes the median of the first and last 20 points. then it takes the median of both values and that is 
+considered the continuum flux
 
 The flux of the line center is taken as the median of the points in an interval equal to  tabulated center +- window/30, where window for CaI is defined as 0.6 Angstrom
 
