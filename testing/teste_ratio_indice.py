@@ -89,6 +89,8 @@ print(f"For one spectrum:\n Ratio: {alpha_RV[0]}\n Flux center line: {center_flu
 print("#"*20)
 plt.figure(1)
 plot_line(data=[(wv,flux)], line="CaI",lstyle="-",line_color="black")
+plt.text(0.13, 0.89, f"{target_save_name}, {instr}", fontsize=13, transform=plt.gcf().transFigure)
+plt.text(0.78, 0.89, "Ca I line", fontsize=13, transform=plt.gcf().transFigure)
 plt.axhline(y=center_flux_line_arr,xmin=0,xmax=1,ls="--",ms=0.2,c="red")
 plt.axhline(y=flux_continuum_arr,xmin=0,xmax=1,ls="--",ms=0.2,c="red")
 line_wv = 6572.795; window = 0.7
@@ -99,6 +101,8 @@ flux_normalized = flux1/np.median(flux1)
 plt.fill_betweenx(y=[np.min(flux_normalized),np.max(flux_normalized)], x1=line_wv-window, x2=line_wv - window + 0.2, alpha=0.15,color="blue")
 plt.fill_betweenx(y=[np.min(flux_normalized),np.max(flux_normalized)], x1=line_wv + window - 0.2, x2=line_wv + window, alpha=0.15,color="blue")
 plt.fill_betweenx(y=[np.min(flux_normalized),np.max(flux_normalized)], x1=line_wv-0.03, x2=line_wv+0.03,alpha=0.15,color="orange")
+plt.title("")
+
 plt.savefig("CaI_line_alpha_RV.pdf",bbox_inches="tight")
 
 #Plot that first spectra three times, one in the original position and the other two shifted in wavelength.

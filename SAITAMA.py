@@ -335,10 +335,10 @@ def SAITAMA(stars, instruments, indices, max_spectra, min_snr,download, neglect_
                     dic = {"STAR_ID":star_name,"INSTR":instr,"TIME_SPAN":t_span,"SNR_MIN":snr_min,"SNR_MAX":snr_max,"I_CAII_N_SPECTRA":n_spec}
 
                     # only compute periodogram if star has at least 50 spectra in a time span of at least 2 years
-                    results, gaps, flag_period, period, period_err, harmonics_list, amplitude, amplitude_err = gls(star_name, instr, bjd-2450000, I_CaII, y_err=I_CaII_err, 
-                                                                                             pmin=1.5, pmax=1e4, steps=1e5, print_info = False, save=True, folder_path=folder_path)
-                    report_periodogram = get_report_periodogram(dic,gaps,period,period_err,amplitude, amplitude_err,flag_period,harmonics_list,folder_path)
-                    print(report_periodogram)
+                    results, gaps, flag_period, period, period_err, harmonics_list, amplitude, amplitude_err = gls(star_name, instr, df, bjd-2450000, I_CaII, y_err=I_CaII_err, 
+                                                                                             pmin=1.5, pmax=t_span, steps=1e6, print_info = False, save=True, folder_path=folder_path)
+                    #report_periodogram = get_report_periodogram(dic,gaps,period,period_err,amplitude, amplitude_err,flag_period,harmonics_list,folder_path)
+                    #print(report_periodogram)
                     plt.clf()
                 else:
                     period = 0
@@ -404,8 +404,8 @@ def SAITAMA(stars, instruments, indices, max_spectra, min_snr,download, neglect_
 
         snr_min = np.min(master_df["SNR"]); snr_max = np.max(master_df["SNR"])
         print(master_df)
+        
         subset_df = master_df.dropna(subset=["I_CaII","I_CaII_err","bjd"])
-        print(subset_df)
         bjd = subset_df["bjd"]
         I_CaII = subset_df["I_CaII"]
         I_CaII_err = subset_df["I_CaII_err"]
@@ -417,10 +417,10 @@ def SAITAMA(stars, instruments, indices, max_spectra, min_snr,download, neglect_
             dic = {"STAR_ID":star_name,"INSTR":list_instruments,"TIME_SPAN":t_span,"SNR_MIN":snr_min,"SNR_MAX":snr_max,"I_CAII_N_SPECTRA":n_spec_CaII}
 
             # only compute periodogram if star has at least 50 spectra in a time span of at least 2 years
-            results, gaps, flag_period, period, period_err, harmonics_list, amplitude, amplitude_err = gls(star_name, None, bjd-2450000, I_CaII, y_err=I_CaII_err, 
-                                                                                    pmin=1.5, pmax=1e4, steps=1e5, print_info = False, save=True, folder_path=f"{final_path}/{star_name}/")
-            report_periodogram = get_report_periodogram(dic,gaps,period,period_err,flag_period, amplitude, amplitude_err, harmonics_list,folder_path=f"{final_path}/{star_name}/")
-            print(report_periodogram)
+            results, gaps, flag_period, period, period_err, harmonics_list, amplitude, amplitude_err = gls(star_name, None, master_df, bjd-2450000, I_CaII, y_err=I_CaII_err, 
+                                                                                    pmin=1.5, pmax=t_span, steps=1e6, print_info = False, save=True, folder_path=f"{final_path}/{star_name}/")
+            #report_periodogram = get_report_periodogram(dic,flag,period,period_err,flag_period, amplitude, amplitude_err, harmonics_list, folder_path=f"{final_path}/{star_name}/")
+            #print(report_periodogram)
             plt.clf()
         else:
             period = 0
