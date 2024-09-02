@@ -57,6 +57,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import tqdm
 import math
+import time
+import requests
 
 from astroquery.eso import Eso # type: ignore
 from astropy.io import fits
@@ -80,11 +82,31 @@ actin = ACTIN()
 global logger
 eso = Eso()
 
+def download_spectra(eso, datasets, destination, max_retries=5):
+    '''
+    Downloads the spectra and safeguards against connection errors.
+    '''
+    retries = 0
+    while retries < max_retries:
+        try:
+            #download the data
+            eso.retrieve_data(datasets=datasets, destination=destination)
+            print("Download completed successfully.")
+            return
+        except requests.exceptions.ConnectionError as e:
+            retries += 1
+            print(f"Connection error: {e}. Retrying {retries}/{max_retries}...")
+            time.sleep(2) #waits before retrying
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            break
+    print("Max retries reached. Please check which files were downloaded.")
+
 def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS", min_snr=10, max_snr=550, box=0.07, path_download_base="tmpdir_download/", max_spectra=250):
     """
     Downloads and processes spectra from ESO database.
 
-    Parameters:
+    Args:
     eso: Eso instance from astroquery.
     search_name: Name to search in ESO database.
     name_target: Name of the target.
@@ -151,11 +173,11 @@ def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS"
             f_new = fs[0] + ":" + fs[1] + ":" + f"{x:06.3f}"
             tbl_ret.append(f)
             tbl_ret.append(f_new)
-        eso.retrieve_data(tbl_ret, destination=path_download + "ADP/")
+        download_spectra(eso, datasets=tbl_ret, destination=path_download + "ADP/", max_retries=5)
     else:
         # pass
         table = list(tbl_search["ARCFILE"])
-        eso.retrieve_data(table, destination=path_download + "ADP/")
+        download_spectra(eso, datasets=table, destination=path_download + "ADP/", max_retries=5)
         
     return paths_download
 
