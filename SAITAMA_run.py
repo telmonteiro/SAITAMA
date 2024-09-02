@@ -24,7 +24,7 @@ indices = ["I_CaII", "I_Ha06", "I_NaI"]  # indices for activity
 max_spectra = 150 # maximum spectra to be selected
 min_snr = 15 #minimum overall SNR
 
-download = False #download from ESO database?
+download = True #download from ESO database?
 download_path = "download_spectra" #folder to download spectra
 final_path = "pipeline_products" #folder to save products
 username_eso = "telmonteiro" #ESO database username
