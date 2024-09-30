@@ -1,5 +1,5 @@
 '''
-This file contains functions to be used to compute the activity periodogram in the ACTINometer pipeline
+This file contains functions to be used to compute the activity periodogram in the SAITAMA pipeline
 '''
 import numpy as np
 import pandas as pd
