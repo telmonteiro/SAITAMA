@@ -50,7 +50,6 @@ Returns:
     - report\_periodogram\_{star}.txt: txt file that contains a small report on the periodogram computed and the WF, as well as the harmonics
 - master_df_{target_save_name}.fits: FITS file that contains the information for each instrument separately plus a BINTable + Header for the combined data
 - {star}\_GLS.pdf and {star}\_WF.pdf: plots of the periodogram of the CaII H&K indice and the respective Window Function for the combined data
-- report_periodogram\_{star}.txt: txt file that contains a small report on the periodogram computed and the WF, as well as the harmonics for the combined data
 
 The testing phase of this pipeline includes the 3 stars from Pepe et al. 2011 and 15 other stars chosen from SWEET-Cat, that agree with
 - Vmag < 8
