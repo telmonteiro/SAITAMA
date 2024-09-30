@@ -404,6 +404,5 @@ def get_calibrations_CaII(star_gaia_dr3, instrument, I_CaII,I_CaII_err):
 
     #computing rotation period of star using 2 different calibrations, as well as the age of the star if possible
     prot_n84, prot_n84_err, prot_m08, prot_m08_err, age_m08, age_m08_err = calc_prot_age(log_rhk, bv)
-    #for HARPS and ESPRESSO this may work well, but for UVES the calibrations may be bad or non existent?
 
     return smw, smw_err, log_rhk, log_rhk_err, prot_n84, prot_n84_err, prot_m08, prot_m08_err, age_m08, age_m08_err

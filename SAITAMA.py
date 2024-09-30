@@ -163,21 +163,8 @@ def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS"
         os.mkdir(path_download + "ADP/")
         paths_download.append(path_download)
 
-    # This part is to get the ancillary data, the original s1D and CCF files
-    if instrument == "HARPS":
-        tbl_adp = list(tbl_search["ARCFILE"])
-        tbl_ret = []
-        for f in tbl_adp:
-            fs = f.split(":")
-            x = (float(fs[-1]) * 1000.0 + 1.0) / 1000.0
-            f_new = fs[0] + ":" + fs[1] + ":" + f"{x:06.3f}"
-            tbl_ret.append(f)
-            tbl_ret.append(f_new)
-        download_spectra(eso, datasets=tbl_ret, destination=path_download + "ADP/", max_retries=5)
-    else:
-        # pass
-        table = list(tbl_search["ARCFILE"])
-        download_spectra(eso, datasets=table, destination=path_download + "ADP/", max_retries=5)
+    table = list(tbl_search["ARCFILE"])
+    download_spectra(eso, datasets=table, destination=path_download + "ADP/", max_retries=5)
         
     return paths_download
 
