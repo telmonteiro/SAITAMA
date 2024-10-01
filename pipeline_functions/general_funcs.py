@@ -1,22 +1,19 @@
 '''
-This file contains general functions to be used by the pipeline function in the SAITAMA pipeline
+This file contains general functions to be used by the pipeline function in the ACTINometer pipeline
 '''
-import sys, os
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
-
 import numpy as np
 import pandas as pd
 import matplotlib.pylab as plt
 import math
 from astropy.io import fits
 from astropy.table import Table
-from pyrhk.pyrhk import calc_smw, get_bv, calc_rhk, calc_prot_age
+from pipeline_functions.pyrhk.pyrhk import calc_smw, get_bv, calc_rhk, calc_prot_age
 from PyAstronomy import pyasl # type: ignore
 import urllib.request
 
 def read_fits(file_name,instrument,mode):
     '''
-    Read fits file and get header and data. Varies if instrument is HARPS, ESPRESSO or UVES.
+    Read fits file and get header and data. Varies if instrument is HARPS, ESPRESSO, UVES or FEROS. missing espresso
     '''
     hdul = fits.open(file_name)
     if instrument == "HARPS":
@@ -238,15 +235,19 @@ def plot_line(data, line, line_color=None,offset=0, line_legend="", lstyle = "-"
         if normalize == True:
             flux_normalized = flux/np.median(flux)
         else: flux_normalized = flux
-        
+
         plt.plot(wv, flux_normalized+offset, lstyle, label=line_legend, color=line_color)
         
-        if plot_continuum_vlines == True: #mostly for CaI
-            plt.axvline(x=line_wv - window + 0.2,ymin=0,ymax=1,ls="--",ms=0.1)
-            plt.axvline(x=line_wv + window - 0.2,ymin=0,ymax=1,ls="--",ms=0.1)
+        if len(flux_normalized) < 50:
+            lim = 5
+        else: lim = 20
+        
+        if plot_continuum_vlines == True:
+            plt.axvline(x=wv[lim],ymin=0,ymax=1,ls="--",ms=0.1)
+            plt.axvline(x=wv[-lim],ymin=0,ymax=1,ls="--",ms=0.1)
         if plot_lines_vlines == True:
-            plt.axvline(x=line_wv-0.03,ymin=0,ymax=1,ls="--",ms=0.1)
-            plt.axvline(x=line_wv+0.03,ymin=0,ymax=1,ls="--",ms=0.1)
+            plt.axvline(x=line_wv-0.05,ymin=0,ymax=1,ls="--",ms=0.1)
+            plt.axvline(x=line_wv+0.05,ymin=0,ymax=1,ls="--",ms=0.1)
 
     plt.axvline(x=line_wv,ymin=0,ymax=1,ls="-",ms=0.2)
     if legend_plot == True: plt.legend()
@@ -277,7 +278,7 @@ def instrument_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, perio
                 "PERIOD_I_CaII":[period,"Period of CaII activity index"],
                 "PERIOD_I_CaII_ERR":[period_err,"Error of period of CaII activity index"],
                 "FLAG_PERIOD":[flag_period,"Goodness of periodogram fit flag. Color based."],
-                "FLAG_RV":[flag_rv_ratio,"Goodness of RV correction indicador. 1 = all good"],
+                "beta_RV":[flag_rv_ratio,"Goodness of RV correction indicador. 1 = all good"],
                 "COMMENT":["Spectra based on SNR - time span trade-off","Comment"],
                 "COMMENT1":["RV obtained from CCF measure (m/s)","Comment"],
                 "COMMENT2":["3D data of wv (Angs) and flux of each spectrum","Comment"]}
@@ -326,7 +327,7 @@ def read_bintable(file,print_info=False):
 
 def plot_RV_indices_diff_instr(star, df, indices, save, path_save):
     """
-    Plot RV and indices given as a function of time
+    Plot RV and indices given as a function of time.
     """
 
     instruments = df["instr"].unique()  # Get unique instruments
@@ -387,10 +388,15 @@ def get_calibrations_CaII(star_gaia_dr3, instrument, I_CaII,I_CaII_err):
     sweetCat_table_url = "http://sweetcat.iastro.pt/catalog/SWEETCAT_Dataframe.csv"
     dtype_SW = dtype={'gaia_dr2':'int64','gaia_dr3':'int64'}
     SC = pd.read_csv(urllib.request.urlopen(sweetCat_table_url), dtype=dtype_SW)
-    teff = SC[SC["gaia_dr3"]==int(star_gaia_dr3[9:])]["Teff"].values[0]
+    teff = SC[SC["gaia_dr3"]==int(star_gaia_dr3[9:])]["Teff"].values[0] 
 
     #get B-V from SIMBAD, if none get from Ballesteros calibration
-    bv, bv_err, bv_ref = get_bv(star_gaia_dr3, alerts=True) 
+    try:
+        bv, bv_err, bv_ref = get_bv(star_gaia_dr3, alerts=True) 
+    except:
+        b = pyasl.BallesterosBV_T()
+        bv = b.t2bv(T=teff) 
+
     if math.isnan(bv) == True:
         b = pyasl.BallesterosBV_T()
         bv = b.t2bv(T=teff) 
@@ -404,5 +410,6 @@ def get_calibrations_CaII(star_gaia_dr3, instrument, I_CaII,I_CaII_err):
 
     #computing rotation period of star using 2 different calibrations, as well as the age of the star if possible
     prot_n84, prot_n84_err, prot_m08, prot_m08_err, age_m08, age_m08_err = calc_prot_age(log_rhk, bv)
+    #for HARPS and ESPRESSO this may work well, but for UVES the calibrations may be bad or non existent?
 
     return smw, smw_err, log_rhk, log_rhk_err, prot_n84, prot_n84_err, prot_m08, prot_m08_err, age_m08, age_m08_err
