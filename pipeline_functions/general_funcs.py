@@ -1,6 +1,10 @@
 '''
 This file contains general functions to be used by the pipeline function in the ACTINometer pipeline
 '''
+
+import sys, os
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
 import numpy as np
 import pandas as pd
 import matplotlib.pylab as plt
@@ -10,6 +14,8 @@ from astropy.table import Table
 from pipeline_functions.pyrhk.pyrhk import calc_smw, get_bv, calc_rhk, calc_prot_age
 from PyAstronomy import pyasl # type: ignore
 import urllib.request
+
+
 
 def read_fits(file_name,instrument,mode):
     '''
