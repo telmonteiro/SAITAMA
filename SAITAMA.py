@@ -102,12 +102,11 @@ def download_spectra(eso, datasets, destination, max_retries=5):
             break
     print("Max retries reached. Please check which files were downloaded.")
 
-
 def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS", min_snr=10, max_snr=550, box=0.07, path_download_base="tmpdir_download/", max_spectra=250):
     """
     Downloads and processes spectra from ESO database.
 
-    Parameters:
+    Args:
     eso: Eso instance from astroquery.
     search_name: Name to search in ESO database.
     name_target: Name of the target.
@@ -305,7 +304,7 @@ def SAITAMA(stars, instruments, indices, max_spectra, min_snr,download, neglect_
                     continue
                 indice_Rneg = np.array(df[f"{indice}_Rneg"]) 
                 Rneg_bad_ind = np.where(indice_Rneg > 0.01)[0]
-                df = df.drop(labels=list(Rneg_bad_ind)) 
+                df = df.drop(list(Rneg_bad_ind)).reset_index(drop=True)
 
             # flag for goodness of RV correction
             gamma_RV_col = np.array(df["RV_flag"])
@@ -313,7 +312,7 @@ def SAITAMA(stars, instruments, indices, max_spectra, min_snr,download, neglect_
             N_good_spec = len(gamma_RV_col[good_spec_ind]) #number of well corrected spectra
             beta_RV = N_good_spec / len(gamma_RV_col)
             bad_spec_indices = np.where(gamma_RV_col == 1)[0]
-            df = df.drop(labels=list(bad_spec_indices)) #dropping the badly corrected spectra
+            df = df.drop(list(bad_spec_indices)).reset_index(drop=True) #dropping the badly corrected spectra
 
             # plot the wavelength of known lines to check if RV correction is good
             for line in ["Ha", "CaIIH", "CaIIK", "FeII", "NaID1", "NaID2", "HeI", "CaI"]:
@@ -340,7 +339,7 @@ def SAITAMA(stars, instruments, indices, max_spectra, min_snr,download, neglect_
                     n_spec = len(bjd)
                 except:
                     n_spec = 0
-                if n_spec >= 50 and t_span >= 2 * 365 and math.isnan(I_CaII[0]) == False:
+                if n_spec >= 50 and t_span >= 2 * 365 and math.isnan(I_CaII.iloc[0]) == False:
                     snr_min = np.min(df["SNR"]); snr_max = np.max(df["SNR"])
                     dic = {"STAR_ID":star_name,"INSTR":instr,"TIME_SPAN":t_span,"SNR_MIN":snr_min,"SNR_MAX":snr_max,"I_CAII_N_SPECTRA":n_spec}
 
@@ -427,7 +426,7 @@ def SAITAMA(stars, instruments, indices, max_spectra, min_snr,download, neglect_
             dic = {"STAR_ID":star_name,"INSTR":list_instruments,"TIME_SPAN":t_span,"SNR_MIN":snr_min,"SNR_MAX":snr_max,"I_CAII_N_SPECTRA":n_spec_CaII}
 
             # only compute periodogram if star has at least 50 spectra in a time span of at least 2 years
-            results, gaps, flag_period, period, period_err, harmonics_list, amplitude, amplitude_err = gls(star_name, None, master_df, bjd-2450000, I_CaII, y_err=I_CaII_err, 
+            results, gaps, flag_period, period, period_err, harmonics_list, amplitude, amplitude_err = gls(star_name, None, bjd-2450000, I_CaII, y_err=I_CaII_err, 
                                                                                     pmin=1.5, pmax=t_span, steps=1e6, print_info = False, save=True, folder_path=f"{final_path}/{star_name}/")
             #report_periodogram = get_report_periodogram(dic,flag,period,period_err,flag_period, amplitude, amplitude_err, harmonics_list, folder_path=f"{final_path}/{star_name}/")
             #print(report_periodogram)
