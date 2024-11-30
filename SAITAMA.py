@@ -49,33 +49,27 @@ Returns:
 - {star}_GLS.pdf and {star}_WF.pdf: plots of the periodogram of the CaII H&K indice and the respective Window Function for the combined data
 - report_periodogram_{star}.txt: txt file that contains a small report on the periodogram computed and the WF, as well as the harmonics for the combined data
 '''
-import os
-import glob
-import logging
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-import tqdm
-import math
-import time
-import requests
+import os, glob, logging, numpy as np, matplotlib.pyplot as plt, pandas as pd, tqdm, math, time, requests
 
 from astroquery.eso import Eso # type: ignore
 from astropy.io import fits
 from astropy.io.fits.verify import VerifyWarning
 from astropy.table import Table
 
-from pipeline_functions.get_spec_funcs import (get_gaiadr3, choose_snr, select_best_spectra)
-from pipeline_functions.general_funcs import (read_fits, plot_line, stats_indice, plot_RV_indices, sigma_clip, instrument_fits_file, 
-                           read_bintable, plot_RV_indices_diff_instr, get_calibrations_CaII)
-from pipeline_functions.RV_correction_funcs import (get_rv_ccf, correct_spec_rv, get_betaRV)
-from pipeline_functions.periodogram_funcs import (gls, get_report_periodogram)
+from pipeline_functions.get_spec_funcs import get_gaiadr3, choose_snr, select_best_spectra
+from pipeline_functions.general_funcs import SpecFunc, dfFuncs, plot_line, instrument_fits_file, read_bintable, plot_indices_diff_instr, get_calibrations_CaII, bin_data
+from pipeline_functions.RV_correction_funcs import RV_correction
+from pipeline_functions.periodogram_funcs import gls_periodogram
 
 from actin2 import ACTIN # type: ignore
 
 import warnings
 warnings.simplefilter('ignore', category=VerifyWarning)
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
+SpecFunc = SpecFunc()
+dfFuncs = dfFuncs()
+RV_correction = RV_correction()
 actin = ACTIN()
 
 # Setup logging logger
@@ -137,8 +131,9 @@ def get_adp_spec(eso, search_name, name_target, neglect_data, instrument="HARPS"
         tbl_search = tbl_search[ind_wav_lim]
 
     # Removing eventually detected manually bad data
-    if name_target in neglect_data.keys():
-        i_clean = [i for i in range(len(tbl_search)) if tbl_search["ARCFILE"][i] not in neglect_data[name_target]]
+    print(tbl_search["ARCFILE"])
+    if search_name in neglect_data.keys():
+        i_clean = [i for i in range(len(tbl_search)) if tbl_search["ARCFILE"][i] not in neglect_data[search_name]]
         tbl_search = tbl_search[i_clean]
 
     print("Found %d datasets." % (len(tbl_search)))
@@ -236,56 +231,54 @@ def SAITAMA(stars, instruments, indices, max_spectra, min_snr,download, neglect_
                 continue
             files_tqdm = tqdm.tqdm(files) #to make a progress bar
             # template spectrum for RV correction
-            sun_template_wv, sun_template_flux, sun_template_flux_err, sun_header = read_fits(file_name="pipeline_functions/Sun1000.fits", instrument=None, mode=None)
+            spectrum_sun, sun_header = SpecFunc._read_fits(file_name="pipeline_functions/Sun1000.fits", instrument=None, mode=None)
+            sun_template_flux = spectrum_sun["flux"]
 
             # creates folders to save the rv corrected fits files
             folder_path = (f"{final_path}/{star_name}/{star_name}_{instr}/")
             if not os.path.isdir(folder_path):
                 os.mkdir(folder_path)
                 os.mkdir(folder_path + "ADP/")
-
+            if not os.path.isdir(folder_path+"gls/"):
+                os.mkdir(folder_path+"gls/")
+            if not os.path.isdir(f"{final_path}/{star_name}/gls/"):
+                os.mkdir(f"{final_path}/{star_name}/gls/")
+            
             data_array = []  # to plot the lines later
             drv = 0.5  # step to search rv
 
             for file in files_tqdm:
 
-                wv, f, f_err, hdr = read_fits(file, instr, mode="raw")
-                # value = negative_flux_treatment(f, method="skip") #method can be "zero_pad"
+                spectrum, hdr = SpecFunc._read_fits(file, instr, mode="raw")
+                wv, f = spectrum["wave"], spectrum["flux"]
+                #f_err[np.isnan(f_err)] = 0 #some spectra have the error = nan, others do not
 
-                bjd, radial_velocity, cc_max, rv, cc, w, f = get_rv_ccf(star = star_name,
-                    stellar_wv = wv, stellar_flux = f, stellar_header = hdr,
-                    template_hdr = sun_header, template_spec = sun_template_flux,
-                    drv = drv, units = "m/s",
-                    instrument = instr, quick_RV = True)
-                #radial_velocity is the RV value, rv is the array of radial velocities given by the CCF
-                wv_corr, mean_delta_wv = correct_spec_rv(w, radial_velocity, units="m/s")
+                bjd, rv_ccf, _, _, _, w, f = RV_correction._get_rv_ccf(star = star_name,
+                                                                                stellar_wv = wv, stellar_flux = f, stellar_header = hdr,
+                                                                                template_hdr = sun_header, template_spec = sun_template_flux,
+                                                                                drv = drv, units = "m/s",
+                                                                                instrument = instr, quick_RV = True)
+                wv_corr = RV_correction._correct_spec_rv(w, rv_ccf, units="m/s")
 
                 #creating the fits file of the corrected spectra
-                data = np.vstack((wv_corr, f, f_err))
+                data = np.vstack((wv_corr, f)) #consider only photon noise because some spectra have nan in the flux errors, and replacing by 0 sets the indicator error to 0
                 hdu = fits.PrimaryHDU(data, header=hdr)
                 hdul = fits.HDUList([hdu])
                 file_path = file.replace(download_path, final_path)
                 hdul.writeto(f"{file_path}", overwrite=True)
                 hdul.close()
-
                 data_array.append(data)
 
                 #run ACTIN2
-                #this part must be corrected, but is included to avoid the case where the first points of flux_error array is zero
-                n_zeros_f_err = len([x for x in f_err if x == 0])
-                if n_zeros_f_err/len(list(f_err)) < 0.1: #fraction of zeros in flux error is below 10% of the size of the array
-                    spectrum = dict(wave=wv_corr, flux=f, flux_err=f_err)
-                else:
-                    spectrum = dict(wave=wv_corr, flux=f)
+                spectrum = dict(wave=wv_corr, flux=f)#, flux_err=f_err)
                 SNR = hdr["SNR"]
                 # flag for goodness of RV correction
-                beta_RV, gamma_RV_arr = get_betaRV([file_path], instr)
+                beta_RV, gamma_RV_arr = RV_correction._get_betaRV([file_path], instr)
                 gamma_RV = gamma_RV_arr[0]
-
-                headers = {"bjd": bjd,"file": file,"instr": instr,"rv": radial_velocity,"obj": star_name,"SNR": SNR,"RV_flag": gamma_RV}
+                headers = {"bjd": bjd,"file": file,"instr": instr,"rv": rv_ccf,"obj": star_name,"SNR": SNR,"RV_flag": gamma_RV}
                 df_ind = actin.CalcIndices(spectrum, headers, indices).indices
                 df = df._append(pd.DataFrame([{**df_ind, **headers}]),ignore_index=True,sort=True)
-            
+
             for ind in indices: #UVES does not cover CaII H&K so need to add empty columns for that indice
                 if ind not in df.columns:
                     nan_array = np.empty((len(df),))
@@ -294,17 +287,18 @@ def SAITAMA(stars, instruments, indices, max_spectra, min_snr,download, neglect_
                     df.insert(0, ind+"_Rneg", nan_array)
                     df.insert(0, ind, nan_array)
 
-            df.to_csv(folder_path + f"df_{star_name}_{instr}.csv", index=False)  # save before sigma clip
-            
+            df.to_csv(folder_path + f"df_{star_name}_{instr}_raw.csv", index=False) 
+
             print("Processing the data...")
 
-            # if there are a lot of zero/negative fluxes in the window (>1%), discard for whatever indice
-            for indice in indices:
-                if indice not in df.columns:
+            # if there are a lot of zero/negative fluxes in the window (>2%), discard for whatever indice
+            for ind in indices:
+                if ind not in df.columns:
                     continue
-                indice_Rneg = np.array(df[f"{indice}_Rneg"]) 
-                Rneg_bad_ind = np.where(indice_Rneg > 0.01)[0]
-                df = df.drop(list(Rneg_bad_ind)).reset_index(drop=True)
+                #if Rneg or Rzero >2%, replace by NaN
+                indice_Rneg = np.array(df[f"{ind}_Rneg"]) 
+                Rneg_bad_ind = np.where(indice_Rneg > 0.02)[0]
+                df.loc[Rneg_bad_ind, f"{ind}"] = np.nan
 
             # flag for goodness of RV correction
             gamma_RV_col = np.array(df["RV_flag"])
@@ -312,73 +306,140 @@ def SAITAMA(stars, instruments, indices, max_spectra, min_snr,download, neglect_
             N_good_spec = len(gamma_RV_col[good_spec_ind]) #number of well corrected spectra
             beta_RV = N_good_spec / len(gamma_RV_col)
             bad_spec_indices = np.where(gamma_RV_col == 1)[0]
-            df = df.drop(list(bad_spec_indices)).reset_index(drop=True) #dropping the badly corrected spectra
+            df = df.drop(list(bad_spec_indices)).reset_index(drop=True) #dropping the badly corrected spectra. the only instance where we really need to drop rows
 
             # plot the wavelength of known lines to check if RV correction is good
             for line in ["Ha", "CaIIH", "CaIIK", "FeII", "NaID1", "NaID2", "HeI", "CaI"]:
+                if not os.path.isdir(folder_path+"spectral_lines/"):
+                    os.mkdir(folder_path+"spectral_lines/")
                 plt.figure(2)
-                plot_line(data=data_array, line=line, line_color=None,plot_lines_vlines=False,plot_continuum_vlines=False)
-                plt.savefig(folder_path+ f"{star_name}_{instr}_{line}.pdf",bbox_inches="tight",)
+                plot_line(data=data_array, line=line, line_color=None,plot_lines_vlines=False,plot_continuum_vlines=False, normalize=True)
+                plt.savefig(folder_path+"spectral_lines/"+f"{star_name}_{instr}_{line}.pdf",bbox_inches="tight",)
                 plt.clf()
 
             if beta_RV > 0:  # if there is at least one spectrum nicely corrected
-                cols = ["I_CaII", "I_Ha06", "I_NaI", "rv"]
-                if len(df) > 10:  # perform a sigma-clip
-                    df = sigma_clip(df, cols, sigma=3)
+                cols = ["I_CaII", "I_Ha06", "I_NaI"]
+                if len(df) > 10:  # perform a sigma-clip only if it has at least 10 rows
+                    #sequential 3-sigma clip
+                    for col in cols:
+                        df = dfFuncs._seq_sigma_clip(df, col, sigma=3, show_plot=False) #indices values
+                        #df = dfFuncs._seq_sigma_clip(df, col+"_err", sigma=3, show_plot=False) #indices error values
+
+                #binning the data to days
+                table = pd.DataFrame()
+                bin_bjd = None
+
+                for i, column in enumerate(df.columns):
+                    if pd.api.types.is_numeric_dtype(df[column]):
+                        #if the column contains numeric values, apply binning
+                        bin_bjd, bin_column_values, _ = bin_data(df["bjd"], df[column])
+                        table[column] = bin_column_values
+                        if bin_bjd is not None and i == 0:
+                            table["bjd"] = bin_bjd
+                    else:
+                        table[column] = df[column]
+
+                df = table.apply(pd.to_numeric, errors='ignore')
+                df.to_csv(folder_path + f"df_{star_name}_{instr}_clean.csv", index=False) 
 
                 plt.figure(3)
-                plot_RV_indices(star_name,df,indices,save=True,path_save=folder_path + f"{star_name}_{instr}.pdf")
+                dfFuncs._plot_time_series(star_name, df, indices, path_save=folder_path + f"{star_name}_{instr}.pdf")
                 plt.clf()
 
-                bjd = df["bjd"]
-                I_CaII = df["I_CaII"]
-                I_CaII_err = df["I_CaII_err"]
+                gls_list = []    
+                fig, axes = plt.subplots(nrows=len(cols),ncols=2,figsize=(14, 0.5+len(cols)*2), sharex="col")
 
-                try:
-                    t_span = max(bjd) - min(bjd)
-                    n_spec = len(bjd)
-                except:
-                    n_spec = 0
-                if n_spec >= 50 and t_span >= 2 * 365 and math.isnan(I_CaII.iloc[0]) == False:
-                    snr_min = np.min(df["SNR"]); snr_max = np.max(df["SNR"])
-                    dic = {"STAR_ID":star_name,"INSTR":instr,"TIME_SPAN":t_span,"SNR_MIN":snr_min,"SNR_MAX":snr_max,"I_CAII_N_SPECTRA":n_spec}
+                for i,ind in enumerate(cols):
 
-                    # only compute periodogram if star has at least 50 spectra in a time span of at least 2 years
-                    results, gaps, flag_period, period, period_err, harmonics_list, amplitude, amplitude_err = gls(star_name, instr, df, bjd-2450000, I_CaII, y_err=I_CaII_err, 
-                                                                                             pmin=1.5, pmax=t_span, steps=1e6, print_info = False, save=True, folder_path=folder_path)
-                    #report_periodogram = get_report_periodogram(dic,gaps,period,period_err,amplitude, amplitude_err,flag_period,harmonics_list,folder_path)
-                    #print(report_periodogram)
-                    plt.clf()
-                else:
-                    period = 0
-                    period_err = 0
-                    flag_period = "white"
+                    df_ind = df[["bjd",ind,ind+"_err"]]
+                    df_ind = df_ind.dropna()
+                    yerr = np.asarray(df_ind[ind+"_err"])
 
-                smw, smw_err, log_rhk, log_rhk_err, prot_n84, prot_n84_err, prot_m08, prot_m08_err, age_m08, age_m08_err = get_calibrations_CaII(star_gaia_dr3,instr,I_CaII,I_CaII_err)
+                    x = np.asarray(df_ind["bjd"])
+                    y = np.asarray(df_ind[ind])
+
+                    if len(df_ind["bjd"]) < 3:
+                        gls_dic = pd.DataFrame({f"period":[0], f"period_err":[0], f"flag_period":["white"]})
+                        gls_list.append(gls_dic)
+                        continue
+
+                    t_span = max(x) - min(x)
+                    gls = gls_periodogram(star = star_name, ind = ind, x = x, y = y, y_err = yerr, 
+                                            pmin=1.5, pmax=t_span, steps=1e6, verb = False, save=True, folder_path=folder_path+"gls/")
+                    results = gls.run()
+
+                    axes[i, 0].errorbar(df_ind[f"bjd"] - 2450000, df_ind[ind], df_ind[ind + "_err"], fmt="k.")
+                    ylabel = rf"I$_{{{ind[2:]}}}$"
+                    axes[i, 0].set_ylabel(ylabel, fontsize=13)
+                    if i == len(cols) - 1:
+                        axes[i, 0].set_xlabel("BJD $-$ 2450000 [d]", fontsize=13)
+                    axes[i, 0].tick_params(axis="both", direction="in", top=True, right=True, which='both')
+
+                    axes[i, 1].semilogx(results["period"], results["power"], "k-")
+                    axes[i, 1].plot(
+                        [min(results["period"]), max(results["period"])],
+                        [results["fap_01"]] * 2,
+                        "--",color="black",lw=0.7)
+                    axes[i, 1].plot(
+                        [min(results["period"]), max(results["period"])],
+                        [results["fap_1"]] * 2,
+                        "--",color="black",lw=0.7)
+                    axes[i, 1].plot(
+                        [min(results["period"]), max(results["period"])],
+                        [results["fap_5"]] * 2,
+                        "--",color="black",lw=0.7)
+                    axes[i, 1].set_ylabel("Norm. Power", fontsize=13)
+                    if i == len(cols) - 1:
+                        axes[i, 1].set_xlabel("Period [d]", fontsize=13)
+                    axes[i, 1].tick_params(axis="both", direction="in", top=True, right=True, which='both')
+                    if results['period_best'] > 0:
+                        axes[i, 1].text(0.05, 0.95,
+                            f"P = {np.around(results['period_best'], 1)} ± {np.around(results['period_best_err'], 1)} d ({results['flag']})",
+                            fontsize=13,
+                            transform=axes[i, 1].transAxes,verticalalignment="top",bbox={"facecolor":'white'})
+
+                    gls_dic = pd.DataFrame({f"period":[results["period_best"]],
+                                f"period_err":[results["period_best_err"]],
+                                f"flag_period":[results["flag"]]})
+                    
+                    gls_list.append(gls_dic)
+
+                fig.subplots_adjust(hspace=0.0)
+                fig.text(0.13, 0.89, f"{star_name} - {instr}", fontsize=17)
+                fig.savefig(folder_path+f"{star_name}_{instr}_GLS.pdf",bbox_inches="tight",dpi=1000)
+                plt.close('all')
+
+                if gls_list:
+                    all_gls_df = pd.concat(gls_list, axis=0, ignore_index=True)
+
+                smw, smw_err, log_rhk, log_rhk_err, prot_n84, prot_n84_err, prot_m08, prot_m08_err, age_m08, age_m08_err = get_calibrations_CaII(star_gaia_dr3,instr,df["I_CaII"],df["I_CaII_err"])
 
                 new_cols_name = ["S_MW","S_MW_err","log_Rhk","log_Rhk_err","prot_n84","prot_n84_err","prot_m08","prot_m08_err","age_m08","age_m08_err"]
                 new_cols = [smw,smw_err,log_rhk,log_rhk_err,prot_n84,prot_n84_err,prot_m08,prot_m08_err,age_m08,age_m08_err]
+                
                 for i,col_name in enumerate(new_cols_name):
                     new_col = np.where(new_cols[i] == 1.000000e+20, np.nan, new_cols[i])
                     df.insert(len(df.columns), col_name, new_col)
 
                 cols += ["S_MW","log_Rhk","prot_n84","prot_m08","age_m08"]
-                stats_df = stats_indice(star_name, cols, df)
-                stats_df.to_csv(folder_path + f"stats_{star_name}.csv")
+                stats_df = dfFuncs._stats(star_name, cols, df)
+                stats_df = pd.concat([stats_df, all_gls_df], axis=1)
+                stats_df.to_csv(folder_path + f"stats_{star_name}_{instr}.csv")
 
-                file_path = folder_path + f"df_stats_{star_name}.fits" #save into the final fits file
-                instrument_fits_file(stats_df, df, file_path, min_snr, max_snr, instr, period, period_err, flag_period, beta_RV)
+                file_path = folder_path + f"df_stats_{star_name}_{instr}.fits" #save into the final fits file
+                instrument_fits_file(indices, stats_df, df, file_path, min_snr, max_snr, instr, gls_list, beta_RV)
 
                 # shutil.rmtree(f"teste_download/{target_save_name}/")  # remove original fits files
 
+
         print("Making the final data frame...")
-        #initialize an empty DataFrame to hold all the data for the current star
-        master_df = pd.DataFrame()
+        master_df = pd.DataFrame() #initialize an empty DataFrame to hold all the data for the current star
         master_header = fits.Header() 
         hdulist = [fits.PrimaryHDU()]  #initialize HDU list with a primary HDU
 
         list_instruments = []
         for instr in instruments:
+
             folder_path = os.path.join(final_path, f"{star_name}/{star_name}_{instr}/")
             file_path = folder_path + f"df_stats_{star_name}.fits"
             
@@ -403,41 +464,90 @@ def SAITAMA(stars, instruments, indices, max_spectra, min_snr,download, neglect_
             if col not in ["file","instr","obj"]:
                 master_df[col] = pd.to_numeric(master_df[col], errors='coerce')
 
-        cols = ["I_CaII", "I_Ha06", "I_NaI", "rv"]
+        cols = ["I_CaII", "I_Ha06", "I_NaI"]
         if len(master_df) > 10:  # perform a sigma-clip
-            master_df = sigma_clip(master_df, cols, sigma=3)
+            for col in cols:
+                master_df = dfFuncs._seq_sigma_clip(master_df, col, sigma=3)
+                #master_df = dfFuncs._seq_sigma_clip(master_df, col+"_err", sigma=3) 
+
+        print(master_df)
 
         plt.figure(5)
-        plot_RV_indices_diff_instr(star_name,master_df,indices,save=True,path_save= f"{final_path}/{star_name}/{star_name}.pdf")
+        #dfFuncs._plot_time_series(star_name, master_df, indices, path_save=f"{final_path}/{star_name}/{star_name}.pdf")
+        plot_indices_diff_instr(star=star_name, df=master_df, indices=indices, save=True, path_save=f"{final_path}/{star_name}/{star_name}.pdf")
         plt.clf()
-
+        
         snr_min = np.min(master_df["SNR"]); snr_max = np.max(master_df["SNR"])
-        print(master_df)
-        
-        subset_df = master_df.dropna(subset=["I_CaII","I_CaII_err","bjd"])
-        bjd = subset_df["bjd"]
-        I_CaII = subset_df["I_CaII"]
-        I_CaII_err = subset_df["I_CaII_err"]
-        
-        t_span = max(bjd) - min(bjd)
-        n_spec_CaII = len(I_CaII)
 
-        if n_spec_CaII >= 50 and t_span >= 2 * 365:
-            dic = {"STAR_ID":star_name,"INSTR":list_instruments,"TIME_SPAN":t_span,"SNR_MIN":snr_min,"SNR_MAX":snr_max,"I_CAII_N_SPECTRA":n_spec_CaII}
+        gls_list = []        
+        fig, axes = plt.subplots(nrows=len(cols),ncols=2,figsize=(14, 0.5+len(cols)*2), sharex="col")
 
-            # only compute periodogram if star has at least 50 spectra in a time span of at least 2 years
-            results, gaps, flag_period, period, period_err, harmonics_list, amplitude, amplitude_err = gls(star_name, None, bjd-2450000, I_CaII, y_err=I_CaII_err, 
-                                                                                    pmin=1.5, pmax=t_span, steps=1e6, print_info = False, save=True, folder_path=f"{final_path}/{star_name}/")
-            #report_periodogram = get_report_periodogram(dic,flag,period,period_err,flag_period, amplitude, amplitude_err, harmonics_list, folder_path=f"{final_path}/{star_name}/")
-            #print(report_periodogram)
-            plt.clf()
-        else:
-            period = 0
-            period_err = 0
-            flag_period = "white"
+        for i,ind in enumerate(cols):
+
+            df_ind = df[["bjd",ind,ind+"_err"]]
+            df_ind = df_ind.dropna()
+            
+            x = np.asarray(df_ind["bjd"], dtype=float)
+            y = np.asarray(df_ind[ind], dtype=float)
+            yerr = np.asarray(df_ind[ind+"_err"], dtype=float)
+
+            if len(df_ind["bjd"]) < 3:
+                gls_dic = pd.DataFrame({f"period":[0], f"period_err":[0], f"flag_period":[0]})
+                gls_list.append(gls_dic)
+                continue
+                
+            t_span = max(x) - min(x)
+            gls = gls_periodogram(star = star_name, ind = ind, x = x, y = y, y_err = yerr, 
+                                    pmin=1.5, pmax=t_span, steps=1e6, verb = False, save=True, folder_path=f"{final_path}/{star_name}/gls/")
+            results = gls.run()
+
+            axes[i, 0].errorbar(x - 2450000, y, yerr, fmt="k.")
+            ylabel = rf"I$_{{{ind[2:]}}}$"
+            axes[i, 0].set_ylabel(ylabel, fontsize=13)
+            if i == len(cols) - 1:
+                axes[i, 0].set_xlabel("BJD $-$ 2450000 [d]", fontsize=13)
+            axes[i, 0].tick_params(axis="both", direction="in", top=True, right=True, which='both')
+
+            axes[i, 1].semilogx(results["period"], results["power"], "k-")
+            axes[i, 1].plot(
+                [min(results["period"]), max(results["period"])],
+                [results["fap_01"]] * 2,
+                "--",color="black",lw=0.7)
+            axes[i, 1].plot(
+                [min(results["period"]), max(results["period"])],
+                [results["fap_1"]] * 2,
+                "--",color="black",lw=0.7)
+            axes[i, 1].plot(
+                [min(results["period"]), max(results["period"])],
+                [results["fap_5"]] * 2,
+                "--",color="black",lw=0.7)
+            axes[i, 1].set_ylabel("Norm. Power", fontsize=13)
+            if i == len(cols) - 1:
+                axes[i, 1].set_xlabel("Period [d]", fontsize=13)
+            axes[i, 1].tick_params(axis="both", direction="in", top=True, right=True, which='both')
+            if results['period_best'] > 0:
+                axes[i, 1].text(0.05, 0.95,
+                    f"P = {np.around(results['period_best'], 1)} ± {np.around(results['period_best_err'], 1)} d ({results['flag']})",
+                    fontsize=13,
+                    transform=axes[i, 1].transAxes,verticalalignment="top",bbox={"facecolor":'white'})
+
+            gls_dic = pd.DataFrame({f"period":[results["period_best"]],
+                        f"period_err":[results["period_best_err"]],
+                        f"flag_period":[results["flag"]]})
+            gls_list.append(gls_dic)
+
+        fig.subplots_adjust(hspace=0.0)
+        fig.text(0.13, 0.89, f"{star_name}", fontsize=17)
+        fig.savefig(f"{final_path}/{star_name}/"+f"{star_name}_GLS.pdf",bbox_inches="tight",dpi=1000)
+        plt.close('all')
+
+        if gls_list:
+            all_gls_df = pd.concat(gls_list, axis=0, ignore_index=True)
 
         cols += ["S_MW","log_Rhk","prot_n84","prot_m08","age_m08"]
-        stats_master_df = stats_indice(star_name, cols, master_df) #computes the statistics. include errors or not?
+        stats_master_df = dfFuncs._stats(star_name, cols, master_df) #computes the statistics. include errors or not?
+        stats_master_df = pd.concat([stats_master_df, all_gls_df], axis=1)
+        stats_master_df.to_csv(f"{final_path}/{star_name}/" + f"stats_{star_name}.csv")
 
         # Ensure all columns are compatible with FITS
         for col in df.columns:
@@ -452,14 +562,16 @@ def SAITAMA(stars, instruments, indices, max_spectra, min_snr,download, neglect_
                     "TIME_SPAN":[t_span, 'Time span in days between first and last observations used'],
                     "SNR_MIN":[snr_min,"Minimum SNR"],
                     "SNR_MAX":[snr_max,"Maximum SNR"],
-                    "PERIOD_I_CaII":[period,"Period of CaII activity index"],
-                    "PERIOD_I_CaII_ERR":[period_err,"Error of period of CaII activity index"],
-                    "FLAG_PERIOD":[flag_period,"Goodness of periodogram fit flag. Color based."],
                     "COMMENT":["Spectra based on SNR - time span trade-off","Comment"],
                     "COMMENT1":["RV obtained from CCF measure (m/s)","Comment"],
                     "COMMENT2":["3D data of wv (Angs) and flux of each spectrum","Comment"]}
+        
+        for i,ind in enumerate(indices):
+            dict_hdr[f"PERIOD_{ind}"] = [gls_list[i]["period"][0],f"Period of {ind} activity index"]
+            dict_hdr[f"PERIOD_{ind}_err"] = [gls_list[i]["period_err"][0],f"Error of period of {ind} activity index"]
+            dict_hdr[f"FLAG_PERIOD_{ind}"] = [gls_list[i]["period"][0],f"Period of {ind} activity index"]
 
-        values = ['I_CaII', 'I_Ha06', 'I_NaI', 'rv', "S_MW", "log_Rhk", "prot_n84", "prot_m08", "age_m08"]
+        values = ['I_CaII', 'I_Ha06', 'I_NaI', "S_MW", "log_Rhk", "prot_n84", "prot_m08", "age_m08"]
         stats = ["max","min","mean","median","std","weighted_mean","N_spectra"]
 
         for i,ind in enumerate(values):
