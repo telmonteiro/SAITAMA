@@ -441,7 +441,7 @@ def SAITAMA(stars, instruments, indices, max_spectra, min_snr,download, neglect_
         for instr in instruments:
 
             folder_path = os.path.join(final_path, f"{star_name}/{star_name}_{instr}/")
-            file_path = folder_path + f"df_stats_{star_name}.fits"
+            file_path = folder_path + f"df_stats_{star_name}_{instr}.fits"
             
             if not os.path.exists(file_path):
                 print(f"File not found: {file_path}")
